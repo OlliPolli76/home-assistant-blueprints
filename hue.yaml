@@ -9,6 +9,7 @@ blueprint:
     • Double-Press (300 ms) → Cover öffnen/schließen  
     • Dynamisches Log-Level (optional abschaltbar)
   domain: automation
+  source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
 
   input:
     switch_device:

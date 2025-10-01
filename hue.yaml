@@ -2,7 +2,7 @@ blueprint:
   name: Hue Wall Module – v21.66
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.66 – Vollständiges Debug-Logging in allen Funktionsblöcken.
+    Version v21.66 –  Vollständiges Debug-Logging in allen Funktionsblöcken.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76

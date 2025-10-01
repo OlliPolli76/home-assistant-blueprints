@@ -2,7 +2,7 @@ blueprint:
   name: Hue Wall Module – v21.66
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.66 –  Vollständiges Debug-Logging in allen Funktionsblöcken.
+    Version v21.66 – Vollständiges Debug-Logging in allen Funktionsblöcken.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -185,7 +185,7 @@ action:
                       level: "{{ log_level }}"
 
           - variables:
-              going_up:    "{{ is_state(active_dir, 'on') }}"
+              going_up: "{{ is_state(active_dir, 'on') }}"
               step: >-
                 {% if going_up %}
                   {{ [speed, max_raw - current_brightness] | min }}
@@ -306,7 +306,8 @@ action:
                       entity_id: "{{ cover }}"
                   - service: system_log.write
                     data:
-                      message: "[Double Press] Cover gesteuert: {{ cover }}"
+                      message: >
+                        [Double Press] Cover gesteuert: {{ cover }}
                       level: "{{ log_level }}"
               - conditions: []
                 sequence:
@@ -315,4 +316,6 @@ action:
                       entity_id: "{{ active_light }}"
                   - service: system_log.write
                     data:
-                      message: "[Single Press] Licht get
+                      message: >
+                        [Single Press] Licht getoggelt: {{ active_light }}
+                      level: "{{ log_level }}"

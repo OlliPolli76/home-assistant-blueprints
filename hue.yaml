@@ -210,7 +210,14 @@ action:
                   - service: system_log.write
                     data:
                       message: "[Dimmrichtung] Max erreicht – Richtung auf 'abwärts' gesetzt"
-                      level: "{{ log_level }}"
+                      level: >-
+  {% set lvl = log_level | lower %}
+  {% if lvl in ['debug','info','warning','error','critical'] %}
+    {{ lvl }}
+  {% else %}
+    warning
+  {% endif %}
+
               - conditions:
                   - condition: template
                     value_template: "{{ current_brightness <= min_brightness }}"

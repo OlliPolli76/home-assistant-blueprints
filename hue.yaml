@@ -1,0 +1,267 @@
+blueprint:
+  name: "Hue Wall Module (Z2M) – v21.52b"
+  description: >
+    Version v21.52b – vereinfacht und korrigiert:  
+    • MQTT-Trigger über frei definierbaren Topic  
+    • PRESS_RELEASE: Licht an/aus oder Cover bei Doppel-Press  
+    • HOLD: Dimmen mit Grenzlogik  
+    • HOLD_RELEASE: Dimmen stoppen  
+    • Double-Press (300 ms) → Cover öffnen/schließen  
+    • Dynamisches Log-Level (optional abschaltbar)
+  domain: automation
+
+  input:
+    switch_device:
+      name: Hue Wall Switch (Z2M)
+      selector:
+        device:
+          integration: mqtt
+
+    trigger_topic:
+      name: MQTT Trigger Topic
+      description: "z. B. zigbee2mqtt/+/action oder zigbee2mqtt/{{ switch_device_name }}/action"
+      default: "zigbee2mqtt/+/action"
+      selector:
+        text:
+
+    target_light_left:
+      name: Linke Lampe oder Gruppe
+      selector:
+        entity:
+          domain: light
+
+    target_light_right:
+      name: Rechte Lampe oder Gruppe
+      selector:
+        entity:
+          domain: light
+
+    reference_light_left:
+      name: Referenzlampe links (optional)
+      default: ""
+      selector:
+        entity:
+          domain: light
+
+    reference_light_right:
+      name: Referenzlampe rechts (optional)
+      default: ""
+      selector:
+        entity:
+          domain: light
+
+    dim_dir_left:
+      name: Richtungs-Boolean links
+      selector:
+        entity:
+          domain: input_boolean
+
+    dim_dir_right:
+      name: Richtungs-Boolean rechts
+      selector:
+        entity:
+          domain: input_boolean
+
+    move_speed_left:
+      name: Schrittweite links
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 80
+          step: 5
+
+    move_speed_right:
+      name: Schrittweite rechts
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 80
+          step: 5
+
+    dim_method_left:
+      name: Dimm-Methode links
+      default: auto
+      selector:
+        select:
+          options: [auto, brightness_step, brightness_pct, brightness]
+
+    dim_method_right:
+      name: Dimm-Methode rechts
+      default: auto
+      selector:
+        select:
+          options: [auto, brightness_step, brightness_pct, brightness]
+
+    target_cover_left:
+      name: Linkes Cover (optional)
+      default: ""
+      selector:
+        entity:
+          domain: cover
+
+    target_cover_right:
+      name: Rechtes Cover (optional)
+      default: ""
+      selector:
+        entity:
+          domain: cover
+
+    min_brightness:
+      name: Mindesthelligkeit
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+
+    log_level:
+      name: Log-Level
+      default: info
+      selector:
+        select:
+          options: [debug, info, warning, error, critical]
+
+trigger:
+  - platform: mqtt
+    topic: !input trigger_topic
+
+mode: single
+max_exceeded: silent
+
+action:
+  - variables:
+      dev_name:        "{{ device_attr(switch_device, 'name') }}"
+      trig:            "{{ trigger.payload }}"
+      is_left:         "{{ trig.startswith('left') }}"
+      active_light:    "{{ target_light_left if is_left else target_light_right }}"
+      ref_light:       "{{ reference_light_left if is_left else reference_light_right }}"
+      use_ref:         "{{ ref_light | length > 0 }}"
+      active_dir:      "{{ dim_dir_left if is_left else dim_dir_right }}"
+      speed:           "{{ move_speed_left if is_left else move_speed_right }}"
+      method:          "{{ dim_method_left if is_left else dim_method_right }}"
+      cover:           "{{ target_cover_left if is_left else target_cover_right }}"
+      max_raw:         254
+      current_brightness: >-
+        {% set ref = ref_light if use_ref else active_light %}
+        {{ state_attr(ref, 'brightness') | int(0) }}
+
+  - service: system_log.write
+    data:
+      message: "[Device={{ dev_name }}] topic={{ trigger.topic }}, payload={{ trig }}"
+      level: "{{ log_level }}"
+
+  - choose:
+      - conditions: "{{ trig in ['left_hold','right_hold'] }}"
+        sequence:
+          - choose:
+              - conditions: "{{ current_brightness >= max_raw }}"
+                sequence:
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: "{{ active_dir }}"
+              - conditions: "{{ current_brightness <= min_brightness }}"
+                sequence:
+                  - service: input_boolean.turn_on
+                    target:
+                      entity_id: "{{ active_dir }}"
+          - variables:
+              going_up:    "{{ is_state(active_dir, 'on') }}"
+              step: >-
+                {% if going_up %}
+                  {{ [speed, max_raw - current_brightness] | min }}
+                {% else %}
+                  {{ -([speed, current_brightness - min_brightness] | min) }}
+                {% endif %}
+              next_bri: "{{ (current_brightness + step) | int }}"
+              feats: >-
+                {% set ref = ref_light if use_ref else active_light %}
+                {{ state_attr(ref, 'supported_features') | int(0) }}
+              support_basic: "{{ (feats % 2) > 0 }}"
+              support_trans: "{{ ((feats // 64) % 2) > 0 }}"
+              dim_key: >-
+                {% if method != 'auto' %}
+                  {{ method }}
+                {% elif support_basic and not support_trans %}
+                  brightness
+                {% elif support_trans %}
+                  brightness_step
+                {% else %}
+                  brightness_pct
+                {% endif %}
+              dim_val: >-
+                {% if dim_key == 'brightness_pct' %}
+                  {{ ((next_bri / max_raw * 100) | round) }}
+                {% else %}
+                  {{ next_bri }}
+                {% endif %}
+          - choose:
+              - conditions: "{{ dim_key == 'brightness' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ active_light }}"
+                    data:
+                      transition: 1
+                      brightness: "{{ dim_val }}"
+              - conditions: "{{ dim_key == 'brightness_pct' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ active_light }}"
+                    data:
+                      transition: 1
+                      brightness_pct: "{{ dim_val }}"
+              - conditions: "{{ dim_key == 'brightness_step' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ active_light }}"
+                    data:
+                      transition: 1
+                      brightness_step: "{{ dim_val }}"
+
+  - choose:
+      - conditions: "{{ trig in ['left_hold_release','right_hold_release'] }}"
+        sequence:
+          - service: light.turn_on
+            target:
+              entity_id: "{{ active_light }}"
+            data:
+              brightness_step: 0
+          - service: input_boolean.toggle
+            target:
+              entity_id: "{{ active_dir }}"
+
+  - choose:
+      - conditions: "{{ trig in ['left_press_release','right_press_release'] }}"
+        sequence:
+          - wait_for_trigger:
+              platform: mqtt
+              id: second_press
+              topic: !input trigger_topic
+              payload: "{{ trig.split('_release')[0] }}"
+            timeout: "00:00:00.300"
+            continue_on_timeout: true
+
+          - variables:
+              double_press: "{{ wait.trigger is defined }}"
+
+          - choose:
+              - conditions: "{{ double_press and cover != '' }}"
+                sequence:
+                  - service: >
+                      {% if trig.startswith('left') %}
+                        cover.open_cover
+                      {% else %}
+                        cover.close_cover
+                      {% endif %}
+                    target:
+                      entity_id: "{{ cover }}"
+              - conditions: []
+                sequence:
+                  - service: light.toggle
+                    target:
+                      entity_id: "{{ active_light }}"

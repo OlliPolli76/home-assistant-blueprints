@@ -154,6 +154,7 @@ blueprint:
       selector:
         select:
           options: [debug, info, warning, error, critical]
+
 trigger:
   - platform: mqtt
     topic: !input trigger_topic
@@ -194,10 +195,14 @@ action:
       level: "{{ log_level }}"
 
   - choose:
-      - conditions: "{{ trig in ['left_hold','right_hold'] }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trig in ['left_hold','right_hold'] }}"
         sequence:
           - choose:
-              - conditions: "{{ current_brightness >= max_raw }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_brightness >= max_raw }}"
                 sequence:
                   - service: input_boolean.turn_off
                     target:
@@ -206,7 +211,9 @@ action:
                     data:
                       message: "[Dimmrichtung] Max erreicht – Richtung auf 'abwärts' gesetzt"
                       level: "{{ log_level }}"
-              - conditions: "{{ current_brightness <= min_brightness }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_brightness <= min_brightness }}"
                 sequence:
                   - service: input_boolean.turn_on
                     target:
@@ -261,7 +268,9 @@ action:
               level: "{{ log_level }}"
 
           - choose:
-              - conditions: "{{ dim_key == 'brightness' }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dim_key == 'brightness' }}"
                 sequence:
                   - service: light.turn_on
                     target:
@@ -269,7 +278,9 @@ action:
                     data:
                       transition: 1
                       brightness: "{{ dim_val }}"
-              - conditions: "{{ dim_key == 'brightness_pct' }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dim_key == 'brightness_pct' }}"
                 sequence:
                   - service: light.turn_on
                     target:
@@ -277,7 +288,9 @@ action:
                     data:
                       transition: 1
                       brightness_pct: "{{ dim_val }}"
-              - conditions: "{{ dim_key == 'brightness_step' }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dim_key == 'brightness_step' }}"
                 sequence:
                   - service: light.turn_on
                     target:
@@ -285,8 +298,10 @@ action:
                     data:
                       transition: 1
                       brightness_step: "{{ dim_val }}"
-- choose:
-      - conditions: "{{ trig in ['left_hold_release','right_hold_release'] }}"
+
+- conditions:
+          - condition: template
+            value_template: "{{ trig in ['left_hold_release','right_hold_release'] }}"
         sequence:
           - service: light.turn_on
             target:
@@ -301,8 +316,9 @@ action:
               message: "[Hold Release] Reset brightness_step + toggle Richtung"
               level: "{{ log_level }}"
 
-  - choose:
-      - conditions: "{{ trig in ['left_press_release','right_press_release'] }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trig in ['left_press_release','right_press_release'] }}"
         sequence:
           - wait_for_trigger:
               platform: mqtt
@@ -325,7 +341,9 @@ action:
               level: "{{ log_level }}"
 
           - choose:
-              - conditions: "{{ double_press and cover != '' }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ double_press and cover != '' }}"
                 sequence:
                   - service: >
                       {% if trig.startswith('left') %}

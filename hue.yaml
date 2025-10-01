@@ -299,7 +299,7 @@ action:
                       transition: 1
                       brightness_step: "{{ dim_val }}"
 
-- conditions:
+      - conditions:
           - condition: template
             value_template: "{{ trig in ['left_hold_release','right_hold_release'] }}"
         sequence:

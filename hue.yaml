@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.53
+  name: Hue Wall Module – v21.65
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.53 – Debug-Logs erweitert, Topic-Logik entfernt.
+    Version v21.65 – Dynamische Topic-Logik entfernt, statischer MQTT-Topic verwendet.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -16,10 +16,11 @@ blueprint:
 
     trigger_topic:
       name: MQTT Trigger Topic
-      description: "z. B. zigbee2mqtt/+/action oder zigbee2mqtt/{{ switch_device_name }}/action"
+      description: "z. B. zigbee2mqtt/+/action oder zigbee2mqtt/dein_gerät/action"
       default: "zigbee2mqtt/+/action"
       selector:
         text:
+          multiline: false
 
     target_light_left:
       name: Linke Lampe oder Gruppe
@@ -130,24 +131,23 @@ max_exceeded: silent
 
 action:
   - variables:
-      dev_name:        "{{ device_attr(switch_device, 'name') }}"
-      trig:            "{{ trigger.payload }}"
-      is_left:         "{{ trig.startswith('left') }}"
-      active_light:    "{{ target_light_left if is_left else target_light_right }}"
-      ref_light:       "{{ reference_light_left if is_left else reference_light_right }}"
-      use_ref:         "{{ ref_light | length > 0 }}"
-      active_dir:      "{{ dim_dir_left if is_left else dim_dir_right }}"
-      speed:           "{{ move_speed_left if is_left else move_speed_right }}"
-      method:          "{{ dim_method_left if is_left else dim_method_right }}"
-      cover:           "{{ target_cover_left if is_left else target_cover_right }}"
-      max_raw:         254
+      trig: "{{ trigger.payload }}"
+      is_left: "{{ trig.startswith('left') }}"
+      active_light: "{{ target_light_left if is_left else target_light_right }}"
+      ref_light: "{{ reference_light_left if is_left else reference_light_right }}"
+      use_ref: "{{ ref_light | length > 0 }}"
+      active_dir: "{{ dim_dir_left if is_left else dim_dir_right }}"
+      speed: "{{ move_speed_left if is_left else move_speed_right }}"
+      method: "{{ dim_method_left if is_left else dim_method_right }}"
+      cover: "{{ target_cover_left if is_left else target_cover_right }}"
+      max_raw: 254
       current_brightness: >-
         {% set ref = ref_light if use_ref else active_light %}
         {{ state_attr(ref, 'brightness') | int(0) }}
 
   - service: system_log.write
     data:
-      message: "[Device={{ dev_name }}] topic={{ trigger.topic }}, payload={{ trig }}"
+      message: "[Payload={{ trig }}] Topic={{ trigger.topic }}"
       level: "{{ log_level }}"
 
   - choose:
@@ -236,29 +236,3 @@ action:
       - conditions: "{{ trig in ['left_press_release','right_press_release'] }}"
         sequence:
           - wait_for_trigger:
-              platform: mqtt
-              id: second_press
-              topic: !input trigger_topic
-              payload: "{{ trig.split('_release')[0] }}"
-            timeout: "00:00:00.300"
-            continue_on_timeout: true
-
-          - variables:
-              double_press: "{{ wait.trigger is defined }}"
-
-          - choose:
-              - conditions: "{{ double_press and cover != '' }}"
-                sequence:
-                  - service: >
-                      {% if trig.startswith('left') %}
-                        cover.open_cover
-                      {% else %}
-                        cover.close_cover
-                      {% endif %}
-                    target:
-                      entity_id: "{{ cover }}"
-              - conditions: []
-                sequence:
-                  - service: light.toggle
-                    target:
-                      entity_id: "{{ active_light }}"

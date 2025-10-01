@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.65
+  name: Hue Wall Module – v21.66
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.65 – Dynamische Topic-Logik entfernt, statischer MQTT-Topic verwendet.
+    Version v21.66 – Vollständiges Debug-Logging in allen Funktionsblöcken.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -117,7 +117,7 @@ blueprint:
 
     log_level:
       name: Log-Level
-      default: info
+      default: debug
       selector:
         select:
           options: [debug, info, warning, error, critical]
@@ -147,7 +147,18 @@ action:
 
   - service: system_log.write
     data:
-      message: "[Payload={{ trig }}] Topic={{ trigger.topic }}"
+      message: >
+        [Trigger]
+        payload={{ trig }},
+        is_left={{ is_left }},
+        active_light={{ active_light }},
+        ref_light={{ ref_light }},
+        use_ref={{ use_ref }},
+        active_dir={{ active_dir }},
+        speed={{ speed }},
+        method={{ method }},
+        cover={{ cover }},
+        current_brightness={{ current_brightness }}
       level: "{{ log_level }}"
 
   - choose:
@@ -159,11 +170,20 @@ action:
                   - service: input_boolean.turn_off
                     target:
                       entity_id: "{{ active_dir }}"
+                  - service: system_log.write
+                    data:
+                      message: "[Dimmrichtung] Max erreicht – Richtung auf 'abwärts' gesetzt"
+                      level: "{{ log_level }}"
               - conditions: "{{ current_brightness <= min_brightness }}"
                 sequence:
                   - service: input_boolean.turn_on
                     target:
                       entity_id: "{{ active_dir }}"
+                  - service: system_log.write
+                    data:
+                      message: "[Dimmrichtung] Min erreicht – Richtung auf 'aufwärts' gesetzt"
+                      level: "{{ log_level }}"
+
           - variables:
               going_up:    "{{ is_state(active_dir, 'on') }}"
               step: >-
@@ -194,6 +214,20 @@ action:
                 {% else %}
                   {{ next_bri }}
                 {% endif %}
+
+          - service: system_log.write
+            data:
+              message: >
+                [Dimm-Berechnung]
+                going_up={{ going_up }},
+                step={{ step }},
+                next_bri={{ next_bri }},
+                dim_key={{ dim_key }},
+                dim_val={{ dim_val }},
+                support_basic={{ support_basic }},
+                support_trans={{ support_trans }}
+              level: "{{ log_level }}"
+
           - choose:
               - conditions: "{{ dim_key == 'brightness' }}"
                 sequence:
@@ -231,8 +265,54 @@ action:
           - service: input_boolean.toggle
             target:
               entity_id: "{{ active_dir }}"
+          - service: system_log.write
+            data:
+              message: "[Hold Release] Reset brightness_step + toggle Richtung"
+              level: "{{ log_level }}"
 
   - choose:
       - conditions: "{{ trig in ['left_press_release','right_press_release'] }}"
         sequence:
           - wait_for_trigger:
+              platform: mqtt
+              id: second_press
+              topic: !input trigger_topic
+              payload: "{{ trig.split('_release')[0] }}"
+            timeout: "00:00:00.300"
+            continue_on_timeout: true
+
+          - variables:
+              double_press: "{{ wait.trigger is defined }}"
+
+          - service: system_log.write
+            data:
+              message: >
+                [Press Release]
+                trig={{ trig }},
+                double_press={{ double_press }},
+                cover={{ cover }}
+              level: "{{ log_level }}"
+
+          - choose:
+              - conditions: "{{ double_press and cover != '' }}"
+                sequence:
+                  - service: >
+                      {% if trig.startswith('left') %}
+                        cover.open_cover
+                      {% else %}
+                        cover.close_cover
+                      {% endif %}
+                    target:
+                      entity_id: "{{ cover }}"
+                  - service: system_log.write
+                    data:
+                      message: "[Double Press] Cover gesteuert: {{ cover }}"
+                      level: "{{ log_level }}"
+              - conditions: []
+                sequence:
+                  - service: light.toggle
+                    target:
+                      entity_id: "{{ active_light }}"
+                  - service: system_log.write
+                    data:
+                      message: "[Single Press] Licht get

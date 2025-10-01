@@ -10,13 +10,18 @@ blueprint:
   input:
     switch_device:
       name: Hue Wall Switch (Z2M)
+      description: >
+        Wähle das Zigbee-Wandmodul, das über MQTT eingebunden ist.
       selector:
         device:
           integration: mqtt
 
     trigger_topic:
       name: MQTT Trigger Topic
-      description: "z. B. zigbee2mqtt/+/action oder zigbee2mqtt/dein_gerät/action"
+      description: >
+        MQTT ist case-sensitive – Groß- und Kleinschreibung spielt eine Rolle.
+        Bitte gib den Topic ausschließlich in Kleinbuchstaben ein, z. B.:
+        zigbee2mqtt/wohnzimmer/action oder zigbee2mqtt/+/action
       default: "zigbee2mqtt/+/action"
       selector:
         text:
@@ -24,18 +29,24 @@ blueprint:
 
     target_light_left:
       name: Linke Lampe oder Gruppe
+      description: >
+        Die Lampe oder Gruppe, die bei linker Betätigung gesteuert wird.
       selector:
         entity:
           domain: light
 
     target_light_right:
       name: Rechte Lampe oder Gruppe
+      description: >
+        Die Lampe oder Gruppe, die bei rechter Betätigung gesteuert wird.
       selector:
         entity:
           domain: light
 
     reference_light_left:
       name: Referenzlampe links (optional)
+      description: >
+        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die linke Seite dient.
       default: ""
       selector:
         entity:
@@ -43,6 +54,8 @@ blueprint:
 
     reference_light_right:
       name: Referenzlampe rechts (optional)
+      description: >
+        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die rechte Seite dient.
       default: ""
       selector:
         entity:
@@ -50,18 +63,24 @@ blueprint:
 
     dim_dir_left:
       name: Richtungs-Boolean links
+      description: >
+        Input_boolean zur Steuerung der Dimmrichtung links (aufwärts/abwärts).
       selector:
         entity:
           domain: input_boolean
 
     dim_dir_right:
       name: Richtungs-Boolean rechts
+      description: >
+        Input_boolean zur Steuerung der Dimmrichtung rechts (aufwärts/abwärts).
       selector:
         entity:
           domain: input_boolean
 
     move_speed_left:
       name: Schrittweite links
+      description: >
+        Wie stark sich die Helligkeit bei Halten verändert (linke Seite).
       default: 40
       selector:
         number:
@@ -71,6 +90,8 @@ blueprint:
 
     move_speed_right:
       name: Schrittweite rechts
+      description: >
+        Wie stark sich die Helligkeit bei Halten verändert (rechte Seite).
       default: 40
       selector:
         number:
@@ -80,6 +101,8 @@ blueprint:
 
     dim_method_left:
       name: Dimm-Methode links
+      description: >
+        Methode zur Dimmung links – automatisch oder manuell wählbar.
       default: auto
       selector:
         select:
@@ -87,6 +110,8 @@ blueprint:
 
     dim_method_right:
       name: Dimm-Methode rechts
+      description: >
+        Methode zur Dimmung rechts – automatisch oder manuell wählbar.
       default: auto
       selector:
         select:
@@ -94,6 +119,8 @@ blueprint:
 
     target_cover_left:
       name: Linkes Cover (optional)
+      description: >
+        Optional: Ein Cover-Entity, das bei Doppelklick links geöffnet wird.
       default: ""
       selector:
         entity:
@@ -101,6 +128,8 @@ blueprint:
 
     target_cover_right:
       name: Rechtes Cover (optional)
+      description: >
+        Optional: Ein Cover-Entity, das bei Doppelklick rechts geschlossen wird.
       default: ""
       selector:
         entity:
@@ -108,6 +137,8 @@ blueprint:
 
     min_brightness:
       name: Mindesthelligkeit
+      description: >
+        Untergrenze für die Dimmung – verhindert vollständiges Ausschalten.
       default: 5
       selector:
         number:
@@ -117,11 +148,12 @@ blueprint:
 
     log_level:
       name: Log-Level
+      description: >
+        Steuerung der Detailtiefe im System-Log.
       default: debug
       selector:
         select:
           options: [debug, info, warning, error, critical]
-
 trigger:
   - platform: mqtt
     topic: !input trigger_topic
@@ -253,8 +285,7 @@ action:
                     data:
                       transition: 1
                       brightness_step: "{{ dim_val }}"
-
-  - choose:
+- choose:
       - conditions: "{{ trig in ['left_hold_release','right_hold_release'] }}"
         sequence:
           - service: light.turn_on
@@ -306,8 +337,7 @@ action:
                       entity_id: "{{ cover }}"
                   - service: system_log.write
                     data:
-                      message: >
-                        [Double Press] Cover gesteuert: {{ cover }}
+                      message: "[Double Press] Cover gesteuert: {{ cover }}"
                       level: "{{ log_level }}"
               - conditions: []
                 sequence:
@@ -316,6 +346,5 @@ action:
                       entity_id: "{{ active_light }}"
                   - service: system_log.write
                     data:
-                      message: >
-                        [Single Press] Licht getoggelt: {{ active_light }}
+                      message: "[Single Press] Licht getoggelt: {{ active_light }}"
                       level: "{{ log_level }}"

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Hue Wall Module (Z2M) – v21.52b"
+  name: "Hue Wall Module (Z2M) – v21.52c"
   description: >
     Version v21.52b – vereinfacht und korrigiert:  
     • MQTT-Trigger über frei definierbaren Topic  

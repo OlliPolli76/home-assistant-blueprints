@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.68
+  name: Hue Wall Module – v21.69
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.68 – Automatische Topic-Erkennung aus Device + optionaler Manual Override.
+    Version v21.69 – Fix: Doppelklick-Erkennung jetzt device-spezifisch (verhindert Interferenz zwischen mehreren Switches).
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -363,7 +363,7 @@ action:
           - wait_for_trigger:
               platform: mqtt
               id: second_press
-              topic: "zigbee2mqtt/+/action"
+              topic: "{{ trigger.topic }}"
               payload: "{{ trig.split('_release')[0] }}"
             timeout: "00:00:00.300"
             continue_on_timeout: true

@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.69
+  name: Hue Wall Module – v21.70
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.69 – Fix: Doppelklick-Erkennung jetzt device-spezifisch (verhindert Interferenz zwischen mehreren Switches).
+    Version v21.70 – Fix: Log-Level Fehler behoben (Input korrekt als Variable behandelt).
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -166,6 +166,7 @@ max_exceeded: silent
 action:
   # Device-Filterung: Nur das ausgewählte Device verarbeiten
   - variables:
+      log_level_input: !input log_level
       manual_name: !input z2m_friendly_name
       actual_device: "{{ trigger.topic.split('/')[1] }}"
       # Versuche automatisch den Device-Namen zu ermitteln
@@ -191,7 +192,7 @@ action:
         auto_detected={{ auto_device_name }},
         manual_override={{ manual_name }},
         is_correct={{ is_correct_device }}
-      level: "{{ log_level }}"
+      level: "{{ log_level_input }}"
 
   # Abbruch wenn falsches Device
   - condition: template
@@ -227,7 +228,7 @@ action:
         method={{ method }},
         cover={{ cover }},
         current_brightness={{ current_brightness }}
-      level: "{{ log_level }}"
+      level: "{{ log_level_input }}"
 
   - choose:
       - conditions:
@@ -245,7 +246,7 @@ action:
                   - service: system_log.write
                     data:
                       message: "[Dimmrichtung] Max erreicht – Richtung auf 'abwärts' gesetzt"
-                      level: "{{ log_level }}"
+                      level: "{{ log_level_input }}"
 
               - conditions:
                   - condition: template
@@ -257,7 +258,7 @@ action:
                   - service: system_log.write
                     data:
                       message: "[Dimmrichtung] Min erreicht – Richtung auf 'aufwärts' gesetzt"
-                      level: "{{ log_level }}"
+                      level: "{{ log_level_input }}"
 
           - variables:
               going_up: "{{ is_state(active_dir, 'on') }}"
@@ -305,7 +306,7 @@ action:
                 dim_val={{ dim_val }},
                 support_basic={{ support_basic }},
                 support_trans={{ support_trans }}
-              level: "{{ log_level }}"
+              level: "{{ log_level_input }}"
 
           - choose:
               - conditions:
@@ -354,7 +355,7 @@ action:
           - service: system_log.write
             data:
               message: "[Hold Release] Reset brightness_step + toggle Richtung"
-              level: "{{ log_level }}"
+              level: "{{ log_level_input }}"
 
       - conditions:
           - condition: template
@@ -378,7 +379,7 @@ action:
                 trig={{ trig }},
                 double_press={{ double_press }},
                 cover={{ cover }}
-              level: "{{ log_level }}"
+              level: "{{ log_level_input }}"
 
           - choose:
               - conditions:
@@ -396,7 +397,7 @@ action:
                   - service: system_log.write
                     data:
                       message: "[Double Press] Cover gesteuert: {{ cover }}"
-                      level: "{{ log_level }}"
+                      level: "{{ log_level_input }}"
               - conditions: []
                 sequence:
                   - service: light.toggle
@@ -405,4 +406,4 @@ action:
                   - service: system_log.write
                     data:
                       message: "[Single Press] Licht getoggelt: {{ active_light }}"
-                      level: "{{ log_level }}"
+                      level: "{{ log_level_input }}"

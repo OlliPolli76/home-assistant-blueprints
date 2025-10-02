@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.66
+  name: Hue Wall Module – v21.67
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.66 – Vollständiges Debug-Logging in allen Funktionsblöcken.
+    Version v21.67 – Bugfixes: brightness_step korrigiert, Richtungsumkehr-Logik verbessert, Step-Berechnung robuster.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -20,7 +20,7 @@ blueprint:
       name: MQTT Trigger Topic
       description: >
         MQTT ist case-sensitive – Groß- und Kleinschreibung spielt eine Rolle.
-        Bitte gib den Topic ausschließlich in Kleinbuchstaben ein, z. B.:
+        Bitte gib den Topic ausschließlich in Kleinbuchstaben ein, z. B.:
         zigbee2mqtt/wohnzimmer/action oder zigbee2mqtt/+/action
       default: "zigbee2mqtt/+/action"
       selector:
@@ -202,7 +202,7 @@ action:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ current_brightness >= max_raw }}"
+                    value_template: "{{ current_brightness + speed > max_raw and is_state(active_dir, 'on') }}"
                 sequence:
                   - service: input_boolean.turn_off
                     target:
@@ -214,7 +214,7 @@ action:
 
               - conditions:
                   - condition: template
-                    value_template: "{{ current_brightness <= min_brightness }}"
+                    value_template: "{{ current_brightness - speed < min_brightness and is_state(active_dir, 'off') }}"
                 sequence:
                   - service: input_boolean.turn_on
                     target:
@@ -228,9 +228,11 @@ action:
               going_up: "{{ is_state(active_dir, 'on') }}"
               step: >-
                 {% if going_up %}
-                  {{ [speed, max_raw - current_brightness] | min }}
+                  {% set remaining = max_raw - current_brightness %}
+                  {{ [speed, [remaining, 0] | max] | min }}
                 {% else %}
-                  {{ -([speed, current_brightness - min_brightness] | min) }}
+                  {% set remaining = current_brightness - min_brightness %}
+                  {{ -([speed, [remaining, 0] | max] | min) }}
                 {% endif %}
               next_bri: "{{ (current_brightness + step) | int }}"
               feats: >-
@@ -251,6 +253,8 @@ action:
               dim_val: >-
                 {% if dim_key == 'brightness_pct' %}
                   {{ ((next_bri / max_raw * 100) | round) }}
+                {% elif dim_key == 'brightness_step' %}
+                  {{ step }}
                 {% else %}
                   {{ next_bri }}
                 {% endif %}

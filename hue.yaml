@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.67
+  name: Hue Wall Module – v21.68
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.67 – Bugfixes: brightness_step korrigiert, Richtungsumkehr-Logik verbessert, Step-Berechnung robuster.
+    Version v21.68 – Automatische Topic-Erkennung aus Device + optionaler Manual Override.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -12,17 +12,18 @@ blueprint:
       name: Hue Wall Switch (Z2M)
       description: >
         Wähle das Zigbee-Wandmodul, das über MQTT eingebunden ist.
+        Der MQTT-Topic wird automatisch aus dem Device erkannt.
       selector:
         device:
           integration: mqtt
 
-    trigger_topic:
-      name: MQTT Trigger Topic
+    z2m_friendly_name:
+      name: Zigbee2MQTT Friendly Name (optional)
       description: >
-        MQTT ist case-sensitive – Groß- und Kleinschreibung spielt eine Rolle.
-        Bitte gib den Topic ausschließlich in Kleinbuchstaben ein, z. B.:
-        zigbee2mqtt/wohnzimmer/action oder zigbee2mqtt/+/action
-      default: "zigbee2mqtt/+/action"
+        Nur ausfüllen, wenn die automatische Erkennung nicht funktioniert.
+        Gib hier den exakten Friendly Name ein, wie er in Zigbee2MQTT konfiguriert ist.
+        Beispiel: "wohnzimmer_schalter" für Topic "zigbee2mqtt/wohnzimmer_schalter/action"
+      default: ""
       selector:
         text:
           multiline: false
@@ -157,12 +158,46 @@ blueprint:
 
 trigger:
   - platform: mqtt
-    topic: !input trigger_topic
+    topic: "zigbee2mqtt/+/action"
 
 mode: single
 max_exceeded: silent
 
 action:
+  # Device-Filterung: Nur das ausgewählte Device verarbeiten
+  - variables:
+      manual_name: !input z2m_friendly_name
+      actual_device: "{{ trigger.topic.split('/')[1] }}"
+      # Versuche automatisch den Device-Namen zu ermitteln
+      auto_device_name: >-
+        {% set entities = device_entities(switch_device) %}
+        {% if entities | count > 0 %}
+          {% set first_entity = entities | first %}
+          {% set friendly = state_attr(first_entity, 'friendly_name') | default('') %}
+          {{ friendly | lower | replace(' ', '_') | replace('-', '_') }}
+        {% else %}
+          {{ device_attr(switch_device, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+        {% endif %}
+      expected_device: "{{ manual_name if manual_name | length > 0 else auto_device_name }}"
+      is_correct_device: "{{ expected_device == actual_device }}"
+
+  - service: system_log.write
+    data:
+      message: >
+        [Device Check]
+        trigger_topic={{ trigger.topic }},
+        actual_device={{ actual_device }},
+        expected_device={{ expected_device }},
+        auto_detected={{ auto_device_name }},
+        manual_override={{ manual_name }},
+        is_correct={{ is_correct_device }}
+      level: "{{ log_level }}"
+
+  # Abbruch wenn falsches Device
+  - condition: template
+    value_template: "{{ is_correct_device }}"
+
+  # Ab hier nur noch Aktionen für das korrekte Device
   - variables:
       trig: "{{ trigger.payload }}"
       is_left: "{{ trig.startswith('left') }}"
@@ -328,7 +363,7 @@ action:
           - wait_for_trigger:
               platform: mqtt
               id: second_press
-              topic: !input trigger_topic
+              topic: "zigbee2mqtt/+/action"
               payload: "{{ trig.split('_release')[0] }}"
             timeout: "00:00:00.300"
             continue_on_timeout: true

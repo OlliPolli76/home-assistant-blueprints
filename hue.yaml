@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.82
+  name: Hue Wall Module – v21.83
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.82 – Konfigurierbarer Doppelklick-Timeout + Fix: Doppelklick ohne Cover ignoriert (kein ungewolltes Licht-Toggle).
+    Version v21.83 – Input-Reihenfolge logisch gruppiert (Links/Rechts/Global), Doppelklick-Timeout auf 400ms.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -36,27 +36,10 @@ blueprint:
         entity:
           domain: light
 
-    target_light_right:
-      name: Rechte Lampe oder Gruppe
-      description: >
-        Die Lampe oder Gruppe, die bei rechter Betätigung gesteuert wird.
-      selector:
-        entity:
-          domain: light
-
     reference_light_left:
       name: Referenzlampe links (optional)
       description: >
         Optional: Eine andere Lampe, deren Helligkeit als Referenz für die linke Seite dient.
-      default: ""
-      selector:
-        entity:
-          domain: light
-
-    reference_light_right:
-      name: Referenzlampe rechts (optional)
-      description: >
-        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die rechte Seite dient.
       default: ""
       selector:
         entity:
@@ -70,29 +53,10 @@ blueprint:
         entity:
           domain: input_boolean
 
-    dim_dir_right:
-      name: Richtungs-Boolean rechts
-      description: >
-        Input_boolean zur Steuerung der Dimmrichtung rechts (aufwärts/abwärts).
-      selector:
-        entity:
-          domain: input_boolean
-
     move_speed_left:
       name: Schrittweite links
       description: >
         Wie stark sich die Helligkeit bei Halten verändert (linke Seite).
-      default: 40
-      selector:
-        number:
-          min: 10
-          max: 80
-          step: 5
-
-    move_speed_right:
-      name: Schrittweite rechts
-      description: >
-        Wie stark sich die Helligkeit bei Halten verändert (rechte Seite).
       default: 40
       selector:
         number:
@@ -109,15 +73,6 @@ blueprint:
         select:
           options: [auto, brightness_step, brightness_pct, brightness]
 
-    dim_method_right:
-      name: Dimm-Methode rechts
-      description: >
-        Methode zur Dimmung rechts – automatisch oder manuell wählbar.
-      default: auto
-      selector:
-        select:
-          options: [auto, brightness_step, brightness_pct, brightness]
-
     target_cover_left:
       name: Linkes Cover (optional)
       description: >
@@ -126,27 +81,6 @@ blueprint:
       selector:
         entity:
           domain: cover
-
-    target_cover_right:
-      name: Rechtes Cover (optional)
-      description: >
-        Optional: Ein Cover-Entity, das bei Doppelklick rechts geschlossen wird.
-      default: ""
-      selector:
-        entity:
-          domain: cover
-
-    double_press_timeout:
-      name: Doppelklick Timeout (ms)
-      description: >
-        Maximale Zeit in Millisekunden zwischen zwei Klicks für Doppelklick-Erkennung.
-      default: 300
-      selector:
-        number:
-          min: 100
-          max: 1000
-          step: 50
-          unit_of_measurement: "ms"
 
     last_press_helper_left:
       name: Zeitstempel-Helfer Links (input_datetime)
@@ -157,6 +91,60 @@ blueprint:
       selector:
         entity:
           domain: input_datetime
+
+    target_light_right:
+      name: Rechte Lampe oder Gruppe
+      description: >
+        Die Lampe oder Gruppe, die bei rechter Betätigung gesteuert wird.
+      selector:
+        entity:
+          domain: light
+
+    reference_light_right:
+      name: Referenzlampe rechts (optional)
+      description: >
+        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die rechte Seite dient.
+      default: ""
+      selector:
+        entity:
+          domain: light
+
+    dim_dir_right:
+      name: Richtungs-Boolean rechts
+      description: >
+        Input_boolean zur Steuerung der Dimmrichtung rechts (aufwärts/abwärts).
+      selector:
+        entity:
+          domain: input_boolean
+
+    move_speed_right:
+      name: Schrittweite rechts
+      description: >
+        Wie stark sich die Helligkeit bei Halten verändert (rechte Seite).
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 80
+          step: 5
+
+    dim_method_right:
+      name: Dimm-Methode rechts
+      description: >
+        Methode zur Dimmung rechts – automatisch oder manuell wählbar.
+      default: auto
+      selector:
+        select:
+          options: [auto, brightness_step, brightness_pct, brightness]
+
+    target_cover_right:
+      name: Rechtes Cover (optional)
+      description: >
+        Optional: Ein Cover-Entity, das bei Doppelklick rechts geschlossen wird.
+      default: ""
+      selector:
+        entity:
+          domain: cover
 
     last_press_helper_right:
       name: Zeitstempel-Helfer Rechts (input_datetime)
@@ -178,6 +166,18 @@ blueprint:
           min: 1
           max: 50
           step: 1
+
+    double_press_timeout:
+      name: Doppelklick Timeout (ms)
+      description: >
+        Maximale Zeit in Millisekunden zwischen zwei Klicks für Doppelklick-Erkennung.
+      default: 400
+      selector:
+        number:
+          min: 100
+          max: 1000
+          step: 50
+          unit_of_measurement: "ms"
 
     log_level:
       name: Log-Level

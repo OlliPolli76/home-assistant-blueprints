@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.78
+  name: Hue Wall Module – v21.79
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.78 – Erweitertes Dimm-Log: Zeigt jetzt Lampen-Features, erkannte Methode und stop_now Status.
+    Version v21.79 – Fix: strptime Format ohne Mikrosekunden (input_datetime speichert nur Sekunden).
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -403,7 +403,8 @@ action:
               last_press_time: "{{ states(press_helper) }}"
               time_diff_ms: >-
                 {% if last_press_time not in ['unknown', 'unavailable', ''] %}
-                  {{ ((now() - strptime(last_press_time, '%Y-%m-%d %H:%M:%S.%f')).total_seconds() * 1000) | int }}
+                  {% set last_dt = strptime(last_press_time, '%Y-%m-%d %H:%M:%S') %}
+                  {{ ((now() - last_dt).total_seconds() * 1000) | int }}
                 {% else %}
                   99999
                 {% endif %}

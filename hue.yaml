@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.76
+  name: Hue Wall Module – v21.78
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.76 – Fix: mode: restart + stop_now Logik aus v20.2 übernommen für korrektes Dimm-Verhalten.
+    Version v21.78 – Erweitertes Dimm-Log: Zeigt jetzt Lampen-Features, erkannte Methode und stop_now Status.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -338,8 +338,11 @@ action:
                 next_bri={{ next_bri }},
                 dim_key={{ dim_key }},
                 dim_val={{ dim_val }},
+                stop_now={{ stop_now }},
                 support_basic={{ support_basic }},
-                support_trans={{ support_trans }}
+                support_trans={{ support_trans }},
+                features_raw={{ feats }},
+                lamp={{ active_light }}
               level: "{{ log_level_input }}"
 
           - choose:

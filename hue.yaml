@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.73
+  name: Hue Wall Module – v21.74
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.73 – Fix: Alle Inputs als Variablen am Anfang gespeichert für korrekte Template-Auflösung.
+    Version v21.74 – Fix: Case-insensitive Device-Vergleich (ignoriert Groß-/Kleinschreibung in Topic).
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -187,7 +187,7 @@ action:
       auto_device_name: >-
         {{ device_attr(switch_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
       expected_device: "{{ manual_name if manual_name | length > 0 else auto_device_name }}"
-      is_correct_device: "{{ expected_device == actual_device }}"
+      is_correct_device: "{{ expected_device | lower == actual_device | lower }}"
 
   - service: system_log.write
     data:

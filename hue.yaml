@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.74
+  name: Hue Wall Module – v21.76
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.74 – Fix: Case-insensitive Device-Vergleich (ignoriert Groß-/Kleinschreibung in Topic).
+    Version v21.76 – Fix: mode: restart + stop_now Logik aus v20.2 übernommen für korrektes Dimm-Verhalten.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -136,6 +136,26 @@ blueprint:
         entity:
           domain: cover
 
+    last_press_helper_left:
+      name: Zeitstempel-Helfer Links (input_datetime)
+      description: >
+        Input_datetime Entity zur Doppelklick-Erkennung links.
+        Erstelle: Einstellungen → Geräte & Dienste → Helfer → Datum und/oder Zeit
+        Aktiviere: "Datum" und "Zeit"
+      selector:
+        entity:
+          domain: input_datetime
+
+    last_press_helper_right:
+      name: Zeitstempel-Helfer Rechts (input_datetime)
+      description: >
+        Input_datetime Entity zur Doppelklick-Erkennung rechts.
+        Erstelle: Einstellungen → Geräte & Dienste → Helfer → Datum und/oder Zeit
+        Aktiviere: "Datum" und "Zeit"
+      selector:
+        entity:
+          domain: input_datetime
+
     min_brightness:
       name: Mindesthelligkeit
       description: >
@@ -160,7 +180,7 @@ trigger:
   - platform: mqtt
     topic: "zigbee2mqtt/+/action"
 
-mode: single
+mode: restart
 max_exceeded: silent
 
 action:
@@ -181,6 +201,8 @@ action:
       dim_method_right: !input dim_method_right
       target_cover_left: !input target_cover_left
       target_cover_right: !input target_cover_right
+      last_press_left: !input last_press_helper_left
+      last_press_right: !input last_press_helper_right
       min_brightness: !input min_brightness
       actual_device: "{{ trigger.topic.split('/')[1] }}"
       # Automatische Erkennung: Nimm den Device-Namen direkt
@@ -278,6 +300,9 @@ action:
                   {{ -([speed, [remaining, 0] | max] | min) }}
                 {% endif %}
               next_bri: "{{ (current_brightness + step) | int }}"
+              stop_now: >-
+                {{ (going_up and current_brightness >= max_raw)
+                or (not going_up and current_brightness <= min_brightness) }}
               feats: >-
                 {% set ref = ref_light if use_ref else active_light %}
                 {{ state_attr(ref, 'supported_features') | int(0) }}
@@ -294,7 +319,9 @@ action:
                   brightness_pct
                 {% endif %}
               dim_val: >-
-                {% if dim_key == 'brightness_pct' %}
+                {% if stop_now %}
+                  0
+                {% elif dim_key == 'brightness_pct' %}
                   {{ ((next_bri / max_raw * 100) | round) }}
                 {% elif dim_key == 'brightness_step' %}
                   {{ step }}
@@ -368,30 +395,32 @@ action:
           - condition: template
             value_template: "{{ trig in ['left_press_release','right_press_release'] }}"
         sequence:
-          - wait_for_trigger:
-              platform: mqtt
-              id: second_press
-              topic: "{{ trigger.topic }}"
-              payload: "{{ trig.split('_release')[0] }}"
-            timeout: "00:00:00.300"
-            continue_on_timeout: true
-
           - variables:
-              double_press: "{{ wait.trigger is defined }}"
+              press_helper: "{{ last_press_left if is_left else last_press_right }}"
+              last_press_time: "{{ states(press_helper) }}"
+              time_diff_ms: >-
+                {% if last_press_time not in ['unknown', 'unavailable', ''] %}
+                  {{ ((now() - strptime(last_press_time, '%Y-%m-%d %H:%M:%S.%f')).total_seconds() * 1000) | int }}
+                {% else %}
+                  99999
+                {% endif %}
+              is_double_press: "{{ time_diff_ms < 300 }}"
 
           - service: system_log.write
             data:
               message: >
                 [Press Release]
                 trig={{ trig }},
-                double_press={{ double_press }},
+                last_press={{ last_press_time }},
+                time_diff_ms={{ time_diff_ms }},
+                is_double_press={{ is_double_press }},
                 cover={{ cover }}
               level: "{{ log_level_input }}"
 
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ double_press and cover != '' }}"
+                    value_template: "{{ is_double_press and cover != '' }}"
                 sequence:
                   - service: >
                       {% if trig.startswith('left') %}
@@ -414,3 +443,10 @@ action:
                     data:
                       message: "[Single Press] Licht getoggelt: {{ active_light }}"
                       level: "{{ log_level_input }}"
+          
+          # Zeitstempel aktualisieren
+          - service: input_datetime.set_datetime
+            target:
+              entity_id: "{{ press_helper }}"
+            data:
+              datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"

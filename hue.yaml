@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.81
+  name: Hue Wall Module – v21.82
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.81 – Doppelklick-Erkennung auf press Events umgestellt (Zeit zwischen zwei press statt press_release).
+    Version v21.82 – Konfigurierbarer Doppelklick-Timeout + Fix: Doppelklick ohne Cover ignoriert (kein ungewolltes Licht-Toggle).
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -136,6 +136,18 @@ blueprint:
         entity:
           domain: cover
 
+    double_press_timeout:
+      name: Doppelklick Timeout (ms)
+      description: >
+        Maximale Zeit in Millisekunden zwischen zwei Klicks für Doppelklick-Erkennung.
+      default: 300
+      selector:
+        number:
+          min: 100
+          max: 1000
+          step: 50
+          unit_of_measurement: "ms"
+
     last_press_helper_left:
       name: Zeitstempel-Helfer Links (input_datetime)
       description: >
@@ -204,6 +216,7 @@ action:
       last_press_left: !input last_press_helper_left
       last_press_right: !input last_press_helper_right
       min_brightness: !input min_brightness
+      double_press_timeout_ms: !input double_press_timeout
       actual_device: "{{ trigger.topic.split('/')[1] }}"
       # Automatische Erkennung: Nimm den Device-Namen direkt
       auto_device_name: >-
@@ -407,7 +420,7 @@ action:
                 {% else %}
                   99999
                 {% endif %}
-              is_double_press: "{{ time_diff_ms < 300 }}"
+              is_double_press: "{{ time_diff_ms < double_press_timeout_ms }}"
 
           - service: system_log.write
             data:
@@ -439,7 +452,7 @@ action:
                 {% else %}
                   99999
                 {% endif %}
-              is_double_press: "{{ time_diff_ms < 300 }}"
+              is_double_press: "{{ time_diff_ms < double_press_timeout_ms }}"
 
           - service: system_log.write
             data:
@@ -469,6 +482,16 @@ action:
                     data:
                       message: "[Double Press] Cover gesteuert: {{ cover }}"
                       level: "{{ log_level_input }}"
+              
+              - conditions:
+                  - condition: template
+                    value_template: "{{ is_double_press and cover == '' }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "[Double Press] Kein Cover konfiguriert - ignoriere Doppelklick"
+                      level: "{{ log_level_input }}"
+              
               - conditions: []
                 sequence:
                   - service: light.toggle

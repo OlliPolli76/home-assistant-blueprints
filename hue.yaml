@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.70
+  name: Hue Wall Module – v21.71
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.70 – Fix: Log-Level Fehler behoben (Input korrekt als Variable behandelt).
+    Version v21.71 – Fix: Device-ID korrekt als Variable für device_entities() und device_attr() bereitgestellt.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -167,17 +167,18 @@ action:
   # Device-Filterung: Nur das ausgewählte Device verarbeiten
   - variables:
       log_level_input: !input log_level
+      switch_device_id: !input switch_device
       manual_name: !input z2m_friendly_name
       actual_device: "{{ trigger.topic.split('/')[1] }}"
       # Versuche automatisch den Device-Namen zu ermitteln
       auto_device_name: >-
-        {% set entities = device_entities(switch_device) %}
+        {% set entities = device_entities(switch_device_id) %}
         {% if entities | count > 0 %}
           {% set first_entity = entities | first %}
           {% set friendly = state_attr(first_entity, 'friendly_name') | default('') %}
           {{ friendly | lower | replace(' ', '_') | replace('-', '_') }}
         {% else %}
-          {{ device_attr(switch_device, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+          {{ device_attr(switch_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
         {% endif %}
       expected_device: "{{ manual_name if manual_name | length > 0 else auto_device_name }}"
       is_correct_device: "{{ expected_device == actual_device }}"

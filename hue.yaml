@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v21.83
+  name: Hue Wall Module – v21.84
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Unterstützt Szenen, Helligkeit, Farbwechsel und Debug-Logging.
-    Version v21.83 – Input-Reihenfolge logisch gruppiert (Links/Rechts/Global), Doppelklick-Timeout auf 400ms.
+    Version v21.84 – Input-Reihenfolge optimiert: Dimm-Methode am Ende, Cover-Inputs oberhalb globaler Settings.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue.yaml
   author: OlliPolli76
@@ -64,24 +64,6 @@ blueprint:
           max: 80
           step: 5
 
-    dim_method_left:
-      name: Dimm-Methode links
-      description: >
-        Methode zur Dimmung links – automatisch oder manuell wählbar.
-      default: auto
-      selector:
-        select:
-          options: [auto, brightness_step, brightness_pct, brightness]
-
-    target_cover_left:
-      name: Linkes Cover (optional)
-      description: >
-        Optional: Ein Cover-Entity, das bei Doppelklick links geöffnet wird.
-      default: ""
-      selector:
-        entity:
-          domain: cover
-
     last_press_helper_left:
       name: Zeitstempel-Helfer Links (input_datetime)
       description: >
@@ -91,6 +73,15 @@ blueprint:
       selector:
         entity:
           domain: input_datetime
+
+    dim_method_left:
+      name: Dimm-Methode links
+      description: >
+        Methode zur Dimmung links – automatisch oder manuell wählbar.
+      default: auto
+      selector:
+        select:
+          options: [auto, brightness_step, brightness_pct, brightness]
 
     target_light_right:
       name: Rechte Lampe oder Gruppe
@@ -128,24 +119,6 @@ blueprint:
           max: 80
           step: 5
 
-    dim_method_right:
-      name: Dimm-Methode rechts
-      description: >
-        Methode zur Dimmung rechts – automatisch oder manuell wählbar.
-      default: auto
-      selector:
-        select:
-          options: [auto, brightness_step, brightness_pct, brightness]
-
-    target_cover_right:
-      name: Rechtes Cover (optional)
-      description: >
-        Optional: Ein Cover-Entity, das bei Doppelklick rechts geschlossen wird.
-      default: ""
-      selector:
-        entity:
-          domain: cover
-
     last_press_helper_right:
       name: Zeitstempel-Helfer Rechts (input_datetime)
       description: >
@@ -155,6 +128,33 @@ blueprint:
       selector:
         entity:
           domain: input_datetime
+
+    dim_method_right:
+      name: Dimm-Methode rechts
+      description: >
+        Methode zur Dimmung rechts – automatisch oder manuell wählbar.
+      default: auto
+      selector:
+        select:
+          options: [auto, brightness_step, brightness_pct, brightness]
+
+    target_cover_left:
+      name: Linkes Cover (optional)
+      description: >
+        Optional: Ein Cover-Entity, das bei Doppelklick links geöffnet wird.
+      default: ""
+      selector:
+        entity:
+          domain: cover
+
+    target_cover_right:
+      name: Rechtes Cover (optional)
+      description: >
+        Optional: Ein Cover-Entity, das bei Doppelklick rechts geschlossen wird.
+      default: ""
+      selector:
+        entity:
+          domain: cover
 
     min_brightness:
       name: Mindesthelligkeit

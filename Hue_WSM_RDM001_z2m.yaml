@@ -1,0 +1,221 @@
+blueprint:
+  name: Hue Wall Module (Z2M) – Grenzlogik beim Start + Debug v20.2
+  description: >-
+    • Version 20.2
+    • Hold startet immer mit Hochdimmen
+    • Bei max/min → Umschalten + weiterdimmen
+    • Kein Richtungswechsel während Halten
+    • Release = Richtungswechsel
+    • Press_Release toggelt Lampen An/Aus
+    • Debug-Log über wählbares Log-Level
+  domain: automation
+  source_url: http://ximt.de/Homeassistant/PhilipsHueWallModule.yaml
+
+  input:
+    switch_device:
+      name: Hue Wall Switch (Z2M)
+      selector:
+        device:
+          integration: mqtt
+
+    trigger_topic:
+      name: MQTT Trigger Topic
+      description: "z. B. zigbee2mqtt/+/action oder zigbee2mqtt/{{ switch_device_name }}/action"
+      default: "zigbee2mqtt/+/action"
+      selector:
+        text:
+
+    target_light_left:
+      name: Linke Lampe oder Gruppe
+      selector:
+        entity:
+          domain: light
+
+    reference_light_left:
+      name: Referenzlampe links (optional)
+      default: ""
+      selector:
+        entity:
+          domain: light
+
+    target_light_right:
+      name: Rechte Lampe oder Gruppe
+      selector:
+        entity:
+          domain: light
+
+    reference_light_right:
+      name: Referenzlampe rechts (optional)
+      default: ""
+      selector:
+        entity:
+          domain: light
+
+    dim_dir_left:
+      name: Richtungs-Boolean links
+      selector:
+        entity:
+          domain: input_boolean
+
+    dim_dir_right:
+      name: Richtungs-Boolean rechts
+      selector:
+        entity:
+          domain: input_boolean
+
+    move_speed_left:
+      name: Schrittweite links
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 80
+          step: 5
+
+    move_speed_right:
+      name: Schrittweite rechts
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 80
+          step: 5
+
+    min_brightness:
+      name: Mindesthelligkeit
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+
+    log_level:
+      name: Log-Level
+      default: warning
+      selector:
+        select:
+          options:
+            - aus
+            - info
+            - debug
+            - warning
+            - error
+
+trigger:
+  - platform: mqtt
+    topic: !input trigger_topic
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  switch_device_id: !input switch_device
+  light_left: !input target_light_left
+  light_right: !input target_light_right
+  ref_left_id: !input reference_light_left
+  ref_right_id: !input reference_light_right
+  speed_left: !input move_speed_left
+  speed_right: !input move_speed_right
+  dim_left_id: !input dim_dir_left
+  dim_right_id: !input dim_dir_right
+  min_raw: !input min_brightness
+  log_level: !input log_level
+
+action:
+  # 0. Eingangsvariablen
+  - variables:
+      trig:      "{{ trigger.payload }}"
+      dev_name:  "{{ device_attr(switch_device_id, 'name') }}"
+      topic_ok:  "{{ trigger.topic == 'zigbee2mqtt/' ~ dev_name ~ '/action' }}"
+      log_on:    "{{ log_level != 'aus' }}"
+      is_left:   "{{ trig.startswith('left') }}"
+      active_light: "{{ light_left if is_left else light_right }}"
+      ref_light:    "{{ ref_left_id if is_left else ref_right_id }}"
+      use_ref:      "{{ ref_light | string | length > 0 }}"
+      active_dir:   "{{ dim_left_id if is_left else dim_right_id }}"
+      active_speed: "{{ speed_left if is_left else speed_right }}"
+      max_raw:      254
+      current_brightness: >
+        {% set ref = ref_light if use_ref else active_light %}
+        {{ state_attr(ref, 'brightness') | int(128) }}
+
+  # 0a. Filter: Abbruch, wenn MQTT-Topic nicht zum ausgewählten Switch passt
+  - choose:
+      - conditions: "{{ not topic_ok }}"
+        sequence: []
+
+  # 1. HOLD → Grenzlogik nur für dein Gerät
+  - choose:
+      - conditions: "{{ trig in ['left_hold','right_hold'] }}"
+        sequence:
+          - choose:
+              - conditions: "{{ current_brightness >= max_raw }}"
+                sequence:
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: "{{ active_dir }}"
+              - conditions: "{{ current_brightness <= min_raw }}"
+                sequence:
+                  - service: input_boolean.turn_on
+                    target:
+                      entity_id: "{{ active_dir }}"
+
+  # 2. HOLD → Dimmen
+  - variables:
+      going_up:    "{{ is_state(active_dir, 'on') }}"
+      step: >-
+        {% if going_up %}
+          {{ [active_speed, max_raw - current_brightness] | min }}
+        {% else %}
+          {{ -([active_speed, current_brightness - min_raw] | min) }}
+        {% endif %}
+      next_brightness: "{{ current_brightness + step }}"
+      stop_now: >
+        {{ (going_up and current_brightness >= max_raw)
+        or (not going_up and current_brightness <= min_raw) }}
+
+  - choose:
+      - conditions: "{{ trig in ['left_hold','right_hold'] }}"
+        sequence:
+          - service: light.turn_on
+            target:
+              entity_id: "{{ active_light }}"
+            data:
+              brightness_step: "{{ 0 if stop_now else step }}"
+              transition: "{{ 1 if not stop_now else 0 }}"
+
+  # 3. HOLD_RELEASE → Stoppen
+  - choose:
+      - conditions: "{{ trig in ['left_hold_release','right_hold_release'] }}"
+        sequence:
+          - service: light.turn_on
+            target:
+              entity_id: "{{ active_light }}"
+            data:
+              brightness_step: 0
+          - service: input_boolean.toggle
+            target:
+              entity_id: "{{ active_dir }}"
+
+  # 4. PRESS_RELEASE → Licht-Toggle
+  - choose:
+      - conditions: "{{ trig in ['left_press_release','right_press_release'] }}"
+        sequence:
+          - service: light.toggle
+            target:
+              entity_id: "{{ active_light }}"
+
+  # 5. Debug-Logs (optional)
+  - choose:
+      - conditions: "{{ trig in ['left_press_release','right_press_release','left_hold','right_hold','left_hold_release','right_hold_release'] and log_on }}"
+        sequence:
+          - service: system_log.write
+            data:
+              message: >-
+                EVENT {{ trig }} →
+                Gerät: {{ dev_name }},
+                Licht: {{ active_light }},
+                Hold-Dir: {{ active_dir }},
+                Helligkeit: {{ current_brightness }}
+              level: "{{ log_level }}"

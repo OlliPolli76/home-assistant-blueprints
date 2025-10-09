@@ -1,51 +1,45 @@
 blueprint:
-  name: Hue Wall Module (Z2M) – Grenzlogik beim Start + Debug v20.2
-  description: >-
-    • Version 20.2
-    • Hold startet immer mit Hochdimmen
-    • Bei max/min → Umschalten + weiterdimmen
-    • Kein Richtungswechsel während Halten
-    • Release = Richtungswechsel
-    • Press_Release toggelt Lampen An/Aus
-    • Debug-Log über wählbares Log-Level
+  name: Hue Wall Module – v20.3
+  description: >
+    Steuert Hue-Leuchten über ein Wandmodul. Verbesserte v20.x ohne Cover/Doppelklick.
+    Version v20.3 – Auto Device-Detection, Dimm-Methoden-Erkennung, Stop bei Min/Max (kein Loop).
   domain: automation
-  source_url: http://ximt.de/Homeassistant/PhilipsHueWallModule.yaml
+  source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue_v20.yaml
+  author: OlliPolli76
 
   input:
     switch_device:
       name: Hue Wall Switch (Z2M)
+      description: >
+        Wähle das Zigbee-Wandmodul, das über MQTT eingebunden ist.
+        Der MQTT-Topic wird automatisch aus dem Device erkannt.
       selector:
         device:
           integration: mqtt
 
-    trigger_topic:
-      name: MQTT Trigger Topic
-      description: "z. B. zigbee2mqtt/+/action oder zigbee2mqtt/{{ switch_device_name }}/action"
-      default: "zigbee2mqtt/+/action"
+    z2m_friendly_name:
+      name: Zigbee2MQTT Friendly Name (optional)
+      description: >
+        Nur ausfüllen, wenn die automatische Erkennung nicht funktioniert.
+        Gib hier den exakten Friendly Name ein, wie er in Zigbee2MQTT konfiguriert ist.
+        Beispiel: "wohnzimmer_schalter" für Topic "zigbee2mqtt/wohnzimmer_schalter/action"
+      default: ""
       selector:
         text:
+          multiline: false
 
     target_light_left:
       name: Linke Lampe oder Gruppe
+      description: >
+        Die Lampe oder Gruppe, die bei linker Betätigung gesteuert wird.
       selector:
         entity:
           domain: light
 
     reference_light_left:
       name: Referenzlampe links (optional)
-      default: ""
-      selector:
-        entity:
-          domain: light
-
-    target_light_right:
-      name: Rechte Lampe oder Gruppe
-      selector:
-        entity:
-          domain: light
-
-    reference_light_right:
-      name: Referenzlampe rechts (optional)
+      description: >
+        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die linke Seite dient.
       default: ""
       selector:
         entity:
@@ -53,27 +47,61 @@ blueprint:
 
     dim_dir_left:
       name: Richtungs-Boolean links
-      selector:
-        entity:
-          domain: input_boolean
-
-    dim_dir_right:
-      name: Richtungs-Boolean rechts
+      description: >
+        Input_boolean zur Steuerung der Dimmrichtung links (aufwärts/abwärts).
       selector:
         entity:
           domain: input_boolean
 
     move_speed_left:
       name: Schrittweite links
+      description: >
+        Wie stark sich die Helligkeit bei Halten verändert (linke Seite).
       default: 40
       selector:
         number:
           min: 10
           max: 80
           step: 5
+
+    dim_method_left:
+      name: Dimm-Methode links
+      description: >
+        Methode zur Dimmung links – automatisch oder manuell wählbar.
+      default: auto
+      selector:
+        select:
+          options: [auto, brightness_step, brightness_pct, brightness]
+
+    target_light_right:
+      name: Rechte Lampe oder Gruppe
+      description: >
+        Die Lampe oder Gruppe, die bei rechter Betätigung gesteuert wird.
+      selector:
+        entity:
+          domain: light
+
+    reference_light_right:
+      name: Referenzlampe rechts (optional)
+      description: >
+        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die rechte Seite dient.
+      default: ""
+      selector:
+        entity:
+          domain: light
+
+    dim_dir_right:
+      name: Richtungs-Boolean rechts
+      description: >
+        Input_boolean zur Steuerung der Dimmrichtung rechts (aufwärts/abwärts).
+      selector:
+        entity:
+          domain: input_boolean
 
     move_speed_right:
       name: Schrittweite rechts
+      description: >
+        Wie stark sich die Helligkeit bei Halten verändert (rechte Seite).
       default: 40
       selector:
         number:
@@ -81,8 +109,19 @@ blueprint:
           max: 80
           step: 5
 
+    dim_method_right:
+      name: Dimm-Methode rechts
+      description: >
+        Methode zur Dimmung rechts – automatisch oder manuell wählbar.
+      default: auto
+      selector:
+        select:
+          options: [auto, brightness_step, brightness_pct, brightness]
+
     min_brightness:
       name: Mindesthelligkeit
+      description: >
+        Untergrenze für die Dimmung – verhindert vollständiges Ausschalten.
       default: 5
       selector:
         number:
@@ -92,102 +131,225 @@ blueprint:
 
     log_level:
       name: Log-Level
+      description: >
+        Steuerung der Detailtiefe im System-Log.
       default: warning
       selector:
         select:
-          options:
-            - aus
-            - info
-            - debug
-            - warning
-            - error
+          options: [aus, debug, info, warning, error]
 
 trigger:
   - platform: mqtt
-    topic: !input trigger_topic
+    topic: "zigbee2mqtt/+/action"
 
 mode: restart
 max_exceeded: silent
 
-variables:
-  switch_device_id: !input switch_device
-  light_left: !input target_light_left
-  light_right: !input target_light_right
-  ref_left_id: !input reference_light_left
-  ref_right_id: !input reference_light_right
-  speed_left: !input move_speed_left
-  speed_right: !input move_speed_right
-  dim_left_id: !input dim_dir_left
-  dim_right_id: !input dim_dir_right
-  min_raw: !input min_brightness
-  log_level: !input log_level
-
 action:
-  # 0. Eingangsvariablen
+  # Device-Filterung: Nur das ausgewählte Device verarbeiten
   - variables:
-      trig:      "{{ trigger.payload }}"
-      dev_name:  "{{ device_attr(switch_device_id, 'name') }}"
-      topic_ok:  "{{ trigger.topic == 'zigbee2mqtt/' ~ dev_name ~ '/action' }}"
-      log_on:    "{{ log_level != 'aus' }}"
-      is_left:   "{{ trig.startswith('left') }}"
-      active_light: "{{ light_left if is_left else light_right }}"
-      ref_light:    "{{ ref_left_id if is_left else ref_right_id }}"
-      use_ref:      "{{ ref_light | string | length > 0 }}"
-      active_dir:   "{{ dim_left_id if is_left else dim_right_id }}"
-      active_speed: "{{ speed_left if is_left else speed_right }}"
-      max_raw:      254
-      current_brightness: >
-        {% set ref = ref_light if use_ref else active_light %}
-        {{ state_attr(ref, 'brightness') | int(128) }}
+      log_level_input: !input log_level
+      switch_device_id: !input switch_device
+      manual_name: !input z2m_friendly_name
+      target_light_left: !input target_light_left
+      target_light_right: !input target_light_right
+      reference_light_left: !input reference_light_left
+      reference_light_right: !input reference_light_right
+      dim_dir_left: !input dim_dir_left
+      dim_dir_right: !input dim_dir_right
+      move_speed_left: !input move_speed_left
+      move_speed_right: !input move_speed_right
+      dim_method_left: !input dim_method_left
+      dim_method_right: !input dim_method_right
+      min_brightness: !input min_brightness
+      actual_device: "{{ trigger.topic.split('/')[1] }}"
+      # Automatische Erkennung: Nimm den Device-Namen direkt
+      auto_device_name: >-
+        {{ device_attr(switch_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+      expected_device: "{{ manual_name if manual_name | length > 0 else auto_device_name }}"
+      is_correct_device: "{{ expected_device | lower == actual_device | lower }}"
+      log_on: "{{ log_level_input != 'aus' }}"
 
-  # 0a. Filter: Abbruch, wenn MQTT-Topic nicht zum ausgewählten Switch passt
+  # Debug-Log: Device Check
   - choose:
-      - conditions: "{{ not topic_ok }}"
-        sequence: []
-
-  # 1. HOLD → Grenzlogik nur für dein Gerät
-  - choose:
-      - conditions: "{{ trig in ['left_hold','right_hold'] }}"
+      - conditions: "{{ log_on }}"
         sequence:
-          - choose:
-              - conditions: "{{ current_brightness >= max_raw }}"
-                sequence:
-                  - service: input_boolean.turn_off
-                    target:
-                      entity_id: "{{ active_dir }}"
-              - conditions: "{{ current_brightness <= min_raw }}"
-                sequence:
-                  - service: input_boolean.turn_on
-                    target:
-                      entity_id: "{{ active_dir }}"
-
-  # 2. HOLD → Dimmen
-  - variables:
-      going_up:    "{{ is_state(active_dir, 'on') }}"
-      step: >-
-        {% if going_up %}
-          {{ [active_speed, max_raw - current_brightness] | min }}
-        {% else %}
-          {{ -([active_speed, current_brightness - min_raw] | min) }}
-        {% endif %}
-      next_brightness: "{{ current_brightness + step }}"
-      stop_now: >
-        {{ (going_up and current_brightness >= max_raw)
-        or (not going_up and current_brightness <= min_raw) }}
-
-  - choose:
-      - conditions: "{{ trig in ['left_hold','right_hold'] }}"
-        sequence:
-          - service: light.turn_on
-            target:
-              entity_id: "{{ active_light }}"
+          - service: system_log.write
             data:
-              brightness_step: "{{ 0 if stop_now else step }}"
-              transition: "{{ 1 if not stop_now else 0 }}"
+              message: >
+                [Device Check]
+                trigger_topic={{ trigger.topic }},
+                actual_device={{ actual_device }},
+                expected_device={{ expected_device }},
+                auto_detected={{ auto_device_name }},
+                manual_override={{ manual_name }},
+                is_correct={{ is_correct_device }}
+              level: "{{ log_level_input }}"
 
-  # 3. HOLD_RELEASE → Stoppen
+  # Abbruch wenn falsches Device
+  - condition: template
+    value_template: "{{ is_correct_device }}"
+
+  # Ab hier nur noch Aktionen für das korrekte Device
+  - variables:
+      trig: "{{ trigger.payload }}"
+      is_left: "{{ trig.startswith('left') }}"
+      active_light: "{{ target_light_left if is_left else target_light_right }}"
+      ref_light: "{{ reference_light_left if is_left else reference_light_right }}"
+      use_ref: "{{ ref_light | length > 0 }}"
+      active_dir: "{{ dim_dir_left if is_left else dim_dir_right }}"
+      speed: "{{ move_speed_left if is_left else move_speed_right }}"
+      method: "{{ dim_method_left if is_left else dim_method_right }}"
+      max_raw: 254
+      current_brightness: >-
+        {% set ref = ref_light if use_ref else active_light %}
+        {{ state_attr(ref, 'brightness') | int(0) }}
+
+  # Debug-Log: Trigger
   - choose:
-      - conditions: "{{ trig in ['left_hold_release','right_hold_release'] }}"
+      - conditions: "{{ log_on }}"
+        sequence:
+          - service: system_log.write
+            data:
+              message: >
+                [Trigger]
+                payload={{ trig }},
+                is_left={{ is_left }},
+                active_light={{ active_light }},
+                ref_light={{ ref_light }},
+                use_ref={{ use_ref }},
+                active_dir={{ active_dir }},
+                speed={{ speed }},
+                method={{ method }},
+                current_brightness={{ current_brightness }}
+              level: "{{ log_level_input }}"
+
+  - choose:
+      # HOLD Event
+      - conditions:
+          - condition: template
+            value_template: "{{ trig in ['left_hold','right_hold'] }}"
+        sequence:
+          # Prüfe ob an Grenzen und stoppe wenn ja
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_brightness >= max_raw and is_state(active_dir, 'on') }}"
+                sequence:
+                  - choose:
+                      - conditions: "{{ log_on }}"
+                        sequence:
+                          - service: system_log.write
+                            data:
+                              message: "[Min/Max] Max erreicht – Stoppe Dimmen"
+                              level: "{{ log_level_input }}"
+                  - stop: "Maximum erreicht"
+
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_brightness <= min_brightness and is_state(active_dir, 'off') }}"
+                sequence:
+                  - choose:
+                      - conditions: "{{ log_on }}"
+                        sequence:
+                          - service: system_log.write
+                            data:
+                              message: "[Min/Max] Min erreicht – Stoppe Dimmen"
+                              level: "{{ log_level_input }}"
+                  - stop: "Minimum erreicht"
+
+          # Dimm-Berechnung
+          - variables:
+              going_up: "{{ is_state(active_dir, 'on') }}"
+              step: >-
+                {% if going_up %}
+                  {% set remaining = max_raw - current_brightness %}
+                  {{ [speed, [remaining, 0] | max] | min }}
+                {% else %}
+                  {% set remaining = current_brightness - min_brightness %}
+                  {{ -([speed, [remaining, 0] | max] | min) }}
+                {% endif %}
+              next_bri: "{{ (current_brightness + step) | int }}"
+              feats: >-
+                {% set ref = ref_light if use_ref else active_light %}
+                {{ state_attr(ref, 'supported_features') | int(0) }}
+              support_basic: "{{ (feats % 2) > 0 }}"
+              support_trans: "{{ ((feats // 64) % 2) > 0 }}"
+              dim_key: >-
+                {% if method != 'auto' %}
+                  {{ method }}
+                {% elif support_basic and not support_trans %}
+                  brightness
+                {% elif support_trans %}
+                  brightness_step
+                {% else %}
+                  brightness_pct
+                {% endif %}
+              dim_val: >-
+                {% if dim_key == 'brightness_pct' %}
+                  {{ ((next_bri / max_raw * 100) | round) }}
+                {% elif dim_key == 'brightness_step' %}
+                  {{ step }}
+                {% else %}
+                  {{ next_bri }}
+                {% endif %}
+
+          # Debug-Log: Dimm-Berechnung
+          - choose:
+              - conditions: "{{ log_on }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: >
+                        [Dimm-Berechnung]
+                        going_up={{ going_up }},
+                        step={{ step }},
+                        next_bri={{ next_bri }},
+                        dim_key={{ dim_key }},
+                        dim_val={{ dim_val }},
+                        support_basic={{ support_basic }},
+                        support_trans={{ support_trans }},
+                        features_raw={{ feats }},
+                        lamp={{ active_light }}
+                      level: "{{ log_level_input }}"
+
+          # Dimmen mit der erkannten Methode
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dim_key == 'brightness' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ active_light }}"
+                    data:
+                      transition: 1
+                      brightness: "{{ dim_val }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dim_key == 'brightness_pct' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ active_light }}"
+                    data:
+                      transition: 1
+                      brightness_pct: "{{ dim_val }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dim_key == 'brightness_step' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ active_light }}"
+                    data:
+                      transition: 1
+                      brightness_step: "{{ dim_val }}"
+
+      # HOLD_RELEASE Event
+      - conditions:
+          - condition: template
+            value_template: "{{ trig in ['left_hold_release','right_hold_release'] }}"
         sequence:
           - service: light.turn_on
             target:
@@ -197,25 +359,26 @@ action:
           - service: input_boolean.toggle
             target:
               entity_id: "{{ active_dir }}"
+          - choose:
+              - conditions: "{{ log_on }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "[Hold Release] Reset brightness_step + toggle Richtung"
+                      level: "{{ log_level_input }}"
 
-  # 4. PRESS_RELEASE → Licht-Toggle
-  - choose:
-      - conditions: "{{ trig in ['left_press_release','right_press_release'] }}"
+      # PRESS_RELEASE Event
+      - conditions:
+          - condition: template
+            value_template: "{{ trig in ['left_press_release','right_press_release'] }}"
         sequence:
           - service: light.toggle
             target:
               entity_id: "{{ active_light }}"
-
-  # 5. Debug-Logs (optional)
-  - choose:
-      - conditions: "{{ trig in ['left_press_release','right_press_release','left_hold','right_hold','left_hold_release','right_hold_release'] and log_on }}"
-        sequence:
-          - service: system_log.write
-            data:
-              message: >-
-                EVENT {{ trig }} →
-                Gerät: {{ dev_name }},
-                Licht: {{ active_light }},
-                Hold-Dir: {{ active_dir }},
-                Helligkeit: {{ current_brightness }}
-              level: "{{ log_level }}"
+          - choose:
+              - conditions: "{{ log_on }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "[Press Release] Licht getoggelt: {{ active_light }}"
+                      level: "{{ log_level_input }}"

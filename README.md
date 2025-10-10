@@ -7,6 +7,7 @@
 > input_select.zigbee_action_topic
 
 # Automation anlegen:
+```
 alias: Zigbee Dropdown aktualisieren
 description: Füllt Helfer "Zigbee Action Topic"
 triggers:
@@ -26,3 +27,4 @@ actions:
         {{ devices | select('string') | list }}
     action: input_select.set_options
 mode: single
+```

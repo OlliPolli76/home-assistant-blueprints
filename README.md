@@ -2,7 +2,9 @@
 „Meine Hue Wall Module Blueprints für Home Assistant
 
 # Dropdown Helfer anlegen:
-input_select.zigbee_action_topic
+> [!CAUTION]
+> Entität ID =
+> input_select.zigbee_action_topic
 
 # Automation anlegen:
 alias: Zigbee Dropdown aktualisieren

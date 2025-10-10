@@ -1,8 +1,8 @@
 blueprint:
-  name: Hue Wall Module – v20.4
+  name: Hue Wall Module – v20.5
   description: >
     Steuert Hue-Leuchten über ein Wandmodul. Verbesserte v20.x ohne Cover/Doppelklick.
-    Version v20.4 – Rechte Seite optional (für einseitige Nutzung).
+    Version v20.5 – Beide Seiten optional (maximale Flexibilität bei der Nutzung).
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue_v20.yaml
   author: OlliPolli76
@@ -29,9 +29,11 @@ blueprint:
           multiline: false
 
     target_light_left:
-      name: Linke Lampe oder Gruppe
+      name: Linke Lampe oder Gruppe (optional)
       description: >
         Die Lampe oder Gruppe, die bei linker Betätigung gesteuert wird.
+        Leer lassen wenn nur rechte Seite genutzt wird.
+      default: ""
       selector:
         entity:
           domain: light
@@ -46,9 +48,11 @@ blueprint:
           domain: light
 
     dim_dir_left:
-      name: Richtungs-Boolean links
+      name: Richtungs-Boolean links (optional)
       description: >
         Input_boolean zur Steuerung der Dimmrichtung links (aufwärts/abwärts).
+        Leer lassen wenn nur rechte Seite genutzt wird.
+      default: ""
       selector:
         entity:
           domain: input_boolean
@@ -208,11 +212,23 @@ action:
       current_brightness: >-
         {% set ref = ref_light if use_ref else active_light %}
         {{ state_attr(ref, 'brightness') | int(0) }}
-      # Prüfe ob rechte Seite konfiguriert ist
+      # Prüfe ob Seiten konfiguriert sind
+      left_side_configured: "{{ target_light_left | length > 0 and dim_dir_left | length > 0 }}"
       right_side_configured: "{{ target_light_right | length > 0 and dim_dir_right | length > 0 }}"
 
-  # Abbruch wenn rechte Seite nicht konfiguriert aber rechts gedrückt
+  # Abbruch wenn Seite nicht konfiguriert
   - choose:
+      - conditions: "{{ is_left and not left_side_configured }}"
+        sequence:
+          - choose:
+              - conditions: "{{ log_on }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "[Ignored] Linke Seite nicht konfiguriert"
+                      level: "{{ log_level_input }}"
+          - stop: "Linke Seite nicht konfiguriert"
+      
       - conditions: "{{ not is_left and not right_side_configured }}"
         sequence:
           - choose:

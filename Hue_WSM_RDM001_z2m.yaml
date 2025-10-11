@@ -1,18 +1,20 @@
 blueprint:
-  name: Hue Wall Module – v20.5
+  name: Hue Wall Module – v20.6
   description: >
-    Steuert Hue-Leuchten über ein Wandmodul. Verbesserte v20.x ohne Cover/Doppelklick.
-    Version v20.5 – Beide Seiten optional (maximale Flexibilität bei der Nutzung).
+    DE: Steuert Hue-Leuchten über ein Wandmodul. Verbesserte v20.6 ohne Cover/Doppelklick.
+    EN: Controls Hue lights via wall module. Improved v20.x without cover/double-click.
+    Version v20.6 – Bilingual labels, English code comments and debug messages.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue_v20.yaml
   author: OlliPolli76
 
   input:
     switch_device:
-      name: Hue Wall Switch (Z2M)
+      name: Hue Wall Switch (Z2M) | Hue Wandschalter (Z2M)
       description: >
-        Wähle das Zigbee-Wandmodul, das über MQTT eingebunden ist.
-        Der MQTT-Topic wird automatisch aus dem Device erkannt.
+        EN: Select the Zigbee wall module integrated via MQTT. The MQTT topic is automatically detected from the device.
+        
+        DE: Wähle das Zigbee-Wandmodul, das über MQTT eingebunden ist. Der MQTT-Topic wird automatisch aus dem Device erkannt.
       selector:
         device:
           integration: mqtt
@@ -20,8 +22,10 @@ blueprint:
     z2m_friendly_name:
       name: Zigbee2MQTT Friendly Name (optional)
       description: >
-        Nur ausfüllen, wenn die automatische Erkennung nicht funktioniert.
-        Gib hier den exakten Friendly Name ein, wie er in Zigbee2MQTT konfiguriert ist.
+        EN: Only fill in if automatic detection doesn't work. Enter the exact friendly name as configured in Zigbee2MQTT.
+        Example: "living_room_switch" for topic "zigbee2mqtt/living_room_switch/action"
+        
+        DE: Nur ausfüllen, wenn die automatische Erkennung nicht funktioniert. Gib hier den exakten Friendly Name ein, wie er in Zigbee2MQTT konfiguriert ist.
         Beispiel: "wohnzimmer_schalter" für Topic "zigbee2mqtt/wohnzimmer_schalter/action"
       default: ""
       selector:
@@ -29,38 +33,44 @@ blueprint:
           multiline: false
 
     target_light_left:
-      name: Linke Lampe oder Gruppe (optional)
+      name: Left Light or Group (optional) | Linke Lampe oder Gruppe (optional)
       description: >
-        Die Lampe oder Gruppe, die bei linker Betätigung gesteuert wird.
-        Leer lassen wenn nur rechte Seite genutzt wird.
+        EN: The light or group controlled by the left button. Leave empty if only using right side.
+        
+        DE: Die Lampe oder Gruppe, die bei linker Betätigung gesteuert wird. Leer lassen wenn nur rechte Seite genutzt wird.
       default: ""
       selector:
         entity:
           domain: light
 
     reference_light_left:
-      name: Referenzlampe links (optional)
+      name: Reference Light Left (optional) | Referenzlampe links (optional)
       description: >
-        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die linke Seite dient.
+        EN: Optional: Another light whose brightness is used as reference for the left side.
+        
+        DE: Optional: Eine andere Lampe, deren Helligkeit als Referenz für die linke Seite dient.
       default: ""
       selector:
         entity:
           domain: light
 
     dim_dir_left:
-      name: Richtungs-Boolean links (optional)
+      name: Direction Boolean Left (optional) | Richtungs-Boolean links (optional)
       description: >
-        Input_boolean zur Steuerung der Dimmrichtung links (aufwärts/abwärts).
-        Leer lassen wenn nur rechte Seite genutzt wird.
+        EN: Input_boolean to control dimming direction left (up/down). Leave empty if only using right side.
+        
+        DE: Input_boolean zur Steuerung der Dimmrichtung links (aufwärts/abwärts). Leer lassen wenn nur rechte Seite genutzt wird.
       default: ""
       selector:
         entity:
           domain: input_boolean
 
     move_speed_left:
-      name: Schrittweite links
+      name: Step Size Left | Schrittweite links
       description: >
-        Wie stark sich die Helligkeit bei Halten verändert (linke Seite).
+        EN: How much the brightness changes when holding (left side).
+        
+        DE: Wie stark sich die Helligkeit bei Halten verändert (linke Seite).
       default: 40
       selector:
         number:
@@ -69,47 +79,55 @@ blueprint:
           step: 5
 
     dim_method_left:
-      name: Dimm-Methode links
+      name: Dimming Method Left | Dimm-Methode links
       description: >
-        Methode zur Dimmung links – automatisch oder manuell wählbar.
+        EN: Method for dimming left – automatic or manually selectable.
+        
+        DE: Methode zur Dimmung links – automatisch oder manuell wählbar.
       default: auto
       selector:
         select:
           options: [auto, brightness_step, brightness_pct, brightness]
 
     target_light_right:
-      name: Rechte Lampe oder Gruppe (optional)
+      name: Right Light or Group (optional) | Rechte Lampe oder Gruppe (optional)
       description: >
-        Die Lampe oder Gruppe, die bei rechter Betätigung gesteuert wird.
-        Leer lassen wenn nur linke Seite genutzt wird.
+        EN: The light or group controlled by the right button. Leave empty if only using left side.
+        
+        DE: Die Lampe oder Gruppe, die bei rechter Betätigung gesteuert wird. Leer lassen wenn nur linke Seite genutzt wird.
       default: ""
       selector:
         entity:
           domain: light
 
     reference_light_right:
-      name: Referenzlampe rechts (optional)
+      name: Reference Light Right (optional) | Referenzlampe rechts (optional)
       description: >
-        Optional: Eine andere Lampe, deren Helligkeit als Referenz für die rechte Seite dient.
+        EN: Optional: Another light whose brightness is used as reference for the right side.
+        
+        DE: Optional: Eine andere Lampe, deren Helligkeit als Referenz für die rechte Seite dient.
       default: ""
       selector:
         entity:
           domain: light
 
     dim_dir_right:
-      name: Richtungs-Boolean rechts (optional)
+      name: Direction Boolean Right (optional) | Richtungs-Boolean rechts (optional)
       description: >
-        Input_boolean zur Steuerung der Dimmrichtung rechts (aufwärts/abwärts).
-        Leer lassen wenn nur linke Seite genutzt wird.
+        EN: Input_boolean to control dimming direction right (up/down). Leave empty if only using left side.
+        
+        DE: Input_boolean zur Steuerung der Dimmrichtung rechts (aufwärts/abwärts). Leer lassen wenn nur linke Seite genutzt wird.
       default: ""
       selector:
         entity:
           domain: input_boolean
 
     move_speed_right:
-      name: Schrittweite rechts
+      name: Step Size Right | Schrittweite rechts
       description: >
-        Wie stark sich die Helligkeit bei Halten verändert (rechte Seite).
+        EN: How much the brightness changes when holding (right side).
+        
+        DE: Wie stark sich die Helligkeit bei Halten verändert (rechte Seite).
       default: 40
       selector:
         number:
@@ -118,18 +136,22 @@ blueprint:
           step: 5
 
     dim_method_right:
-      name: Dimm-Methode rechts
+      name: Dimming Method Right | Dimm-Methode rechts
       description: >
-        Methode zur Dimmung rechts – automatisch oder manuell wählbar.
+        EN: Method for dimming right – automatic or manually selectable.
+        
+        DE: Methode zur Dimmung rechts – automatisch oder manuell wählbar.
       default: auto
       selector:
         select:
           options: [auto, brightness_step, brightness_pct, brightness]
 
     min_brightness:
-      name: Mindesthelligkeit
+      name: Minimum Brightness | Mindesthelligkeit
       description: >
-        Untergrenze für die Dimmung – verhindert vollständiges Ausschalten.
+        EN: Lower limit for dimming – prevents complete turn-off.
+        
+        DE: Untergrenze für die Dimmung – verhindert vollständiges Ausschalten.
       default: 5
       selector:
         number:
@@ -138,9 +160,11 @@ blueprint:
           step: 1
 
     log_level:
-      name: Log-Level
+      name: Log Level | Log-Level
       description: >
-        Steuerung der Detailtiefe im System-Log.
+        EN: Control the detail level in system log.
+        
+        DE: Steuerung der Detailtiefe im System-Log.
       default: warning
       selector:
         select:
@@ -154,7 +178,7 @@ mode: restart
 max_exceeded: silent
 
 action:
-  # Device-Filterung: Nur das ausgewählte Device verarbeiten
+  # Device filtering: Only process the selected device
   - variables:
       log_level_input: !input log_level
       switch_device_id: !input switch_device
@@ -171,14 +195,14 @@ action:
       dim_method_right: !input dim_method_right
       min_brightness: !input min_brightness
       actual_device: "{{ trigger.topic.split('/')[1] }}"
-      # Automatische Erkennung: Nimm den Device-Namen direkt
+      # Automatic detection: Use device name directly
       auto_device_name: >-
         {{ device_attr(switch_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
       expected_device: "{{ manual_name if manual_name | length > 0 else auto_device_name }}"
       is_correct_device: "{{ expected_device | lower == actual_device | lower }}"
       log_on: "{{ log_level_input != 'aus' }}"
 
-  # Debug-Log: Device Check
+  # Debug log: Device check
   - choose:
       - conditions: "{{ log_on }}"
         sequence:
@@ -194,11 +218,11 @@ action:
                 is_correct={{ is_correct_device }}
               level: "{{ log_level_input }}"
 
-  # Abbruch wenn falsches Device
+  # Stop if wrong device
   - condition: template
     value_template: "{{ is_correct_device }}"
 
-  # Ab hier nur noch Aktionen für das korrekte Device
+  # From here on, only actions for the correct device
   - variables:
       trig: "{{ trigger.payload }}"
       is_left: "{{ trig.startswith('left') }}"
@@ -212,11 +236,11 @@ action:
       current_brightness: >-
         {% set ref = ref_light if use_ref else active_light %}
         {{ state_attr(ref, 'brightness') | int(0) }}
-      # Prüfe ob Seiten konfiguriert sind
+      # Check if sides are configured
       left_side_configured: "{{ target_light_left | length > 0 and dim_dir_left | length > 0 }}"
       right_side_configured: "{{ target_light_right | length > 0 and dim_dir_right | length > 0 }}"
 
-  # Abbruch wenn Seite nicht konfiguriert
+  # Stop if side is not configured
   - choose:
       - conditions: "{{ is_left and not left_side_configured }}"
         sequence:
@@ -225,9 +249,9 @@ action:
                 sequence:
                   - service: system_log.write
                     data:
-                      message: "[Ignored] Linke Seite nicht konfiguriert"
+                      message: "[Ignored] Left side not configured"
                       level: "{{ log_level_input }}"
-          - stop: "Linke Seite nicht konfiguriert"
+          - stop: "Left side not configured"
       
       - conditions: "{{ not is_left and not right_side_configured }}"
         sequence:
@@ -236,11 +260,11 @@ action:
                 sequence:
                   - service: system_log.write
                     data:
-                      message: "[Ignored] Rechte Seite nicht konfiguriert"
+                      message: "[Ignored] Right side not configured"
                       level: "{{ log_level_input }}"
-          - stop: "Rechte Seite nicht konfiguriert"
+          - stop: "Right side not configured"
 
-  # Debug-Log: Trigger
+  # Debug log: Trigger
   - choose:
       - conditions: "{{ log_on }}"
         sequence:
@@ -265,7 +289,7 @@ action:
           - condition: template
             value_template: "{{ trig in ['left_hold','right_hold'] }}"
         sequence:
-          # Prüfe ob an Grenzen und stoppe wenn ja
+          # Check if at limits and stop if yes
           - choose:
               - conditions:
                   - condition: template
@@ -276,9 +300,9 @@ action:
                         sequence:
                           - service: system_log.write
                             data:
-                              message: "[Min/Max] Max erreicht – Stoppe Dimmen"
+                              message: "[Min/Max] Maximum reached – Stop dimming"
                               level: "{{ log_level_input }}"
-                  - stop: "Maximum erreicht"
+                  - stop: "Maximum reached"
 
               - conditions:
                   - condition: template
@@ -289,11 +313,11 @@ action:
                         sequence:
                           - service: system_log.write
                             data:
-                              message: "[Min/Max] Min erreicht – Stoppe Dimmen"
+                              message: "[Min/Max] Minimum reached – Stop dimming"
                               level: "{{ log_level_input }}"
-                  - stop: "Minimum erreicht"
+                  - stop: "Minimum reached"
 
-          # Dimm-Berechnung
+          # Dimming calculation
           - variables:
               going_up: "{{ is_state(active_dir, 'on') }}"
               step: >-
@@ -329,14 +353,14 @@ action:
                   {{ next_bri }}
                 {% endif %}
 
-          # Debug-Log: Dimm-Berechnung
+          # Debug log: Dimming calculation
           - choose:
               - conditions: "{{ log_on }}"
                 sequence:
                   - service: system_log.write
                     data:
                       message: >
-                        [Dimm-Berechnung]
+                        [Dimming Calculation]
                         going_up={{ going_up }},
                         step={{ step }},
                         next_bri={{ next_bri }},
@@ -348,7 +372,7 @@ action:
                         lamp={{ active_light }}
                       level: "{{ log_level_input }}"
 
-          # Dimmen mit der erkannten Methode
+          # Dim with the detected method
           - choose:
               - conditions:
                   - condition: template
@@ -399,7 +423,7 @@ action:
                 sequence:
                   - service: system_log.write
                     data:
-                      message: "[Hold Release] Reset brightness_step + toggle Richtung"
+                      message: "[Hold Release] Reset brightness_step + toggle direction"
                       level: "{{ log_level_input }}"
 
       # PRESS_RELEASE Event
@@ -415,5 +439,5 @@ action:
                 sequence:
                   - service: system_log.write
                     data:
-                      message: "[Press Release] Licht getoggelt: {{ active_light }}"
+                      message: "[Press Release] Light toggled: {{ active_light }}"
                       level: "{{ log_level_input }}"

@@ -152,7 +152,13 @@ variables:
           {% set threshold = custom_threshold | int(threshold_default) if custom_threshold else threshold_default %}
           
           {% if battery_level < threshold %}
-            {% set is_critical = battery_level < threshold_critical %}
+            {# Wenn custom threshold gesetzt ist, wird dieser auch für "kritisch" verwendet (halber Wert) #}
+            {% if custom_threshold %}
+              {% set effective_critical = (custom_threshold / 2) | int %}
+            {% else %}
+              {% set effective_critical = threshold_critical %}
+            {% endif %}
+            {% set is_critical = battery_level < effective_critical %}
             {% set area_name = area_name(state.entity_id) if include_area else none %}
             {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
             

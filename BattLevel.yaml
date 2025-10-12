@@ -1,13 +1,20 @@
 blueprint:
-  name: Low battery level detection & notification for all battery sensors
-  description: Regularly test all sensors with 'battery' device-class for crossing
-    a certain battery level threshold and if so execute an action.
+  name: Advanced Low Battery Detection with Custom Thresholds
+  description: |
+    Überwacht alle Batteriesensoren mit individuell konfigurierbaren Schwellwerten 
+    und bietet mehrere Ausgabeformate (Text, HTML, Markdown) für verschiedene 
+    Benachrichtigungskanäle.
+    
+    **Setup:**
+    1. Erstelle Input-Number-Helper für benutzerdefinierte Schwellwerte
+    2. Benenne sie z.B.: input_number.battery_threshold_smartphone
+    3. Referenziere diese Helper in der "Custom Thresholds" Konfiguration
+    
   domain: automation
   input:
-    threshold:
-      name: Battery warning level threshold
-      description: Battery sensors below threshold are assumed to be low-battery (as
-        well as binary battery sensors with value 'on').
+    threshold_default:
+      name: Standard-Warnschwelle
+      description: Standard-Schwellwert für alle Sensoren ohne spezifische Konfiguration
       default: 20
       selector:
         number:
@@ -16,16 +23,46 @@ blueprint:
           unit_of_measurement: '%'
           mode: slider
           step: 5.0
+    
+    threshold_critical:
+      name: Kritische Schwelle
+      description: Schwellwert für kritische Batteriestände (höhere Priorität)
+      default: 10
+      selector:
+        number:
+          min: 5.0
+          max: 100.0
+          unit_of_measurement: '%'
+          mode: slider
+          step: 5.0
+    
+    custom_thresholds:
+      name: Benutzerdefinierte Schwellwerte (optional)
+      description: |
+        Individuelle Schwellwerte für bestimmte Geräte.
+        Format: Eine Zeile pro Gerät
+        
+        Beispiel:
+        sensor.smartphone_battery=15
+        sensor.tablet_battery=20
+        sensor.rauchmelder_batterie=30
+        
+        Leer lassen, wenn nicht benötigt.
+      default: ''
+      selector:
+        text:
+          multiline: true
+    
     time:
-      name: Time to test on
-      description: Test is run at configured time
+      name: Prüfzeit
+      description: Tägliche Prüfzeit für Batteriestand
       default: '10:00:00'
       selector:
         time: {}
+    
     day:
-      name: Weekday to test on
-      description: 'Test is run at configured time either everyday (0) or on a given
-        weekday (1: Monday ... 7: Sunday)'
+      name: Wochentag
+      description: '0 = Täglich, 1 = Montag ... 7 = Sonntag'
       default: 0
       selector:
         number:
@@ -33,44 +70,228 @@ blueprint:
           max: 7.0
           mode: slider
           step: 1.0
+    
     exclude:
-      name: Excluded Sensors
-      description: Battery sensors (e.g. smartphone) to exclude from detection. Only entities are supported, devices must be expanded!
+      name: Ausgeschlossene Sensoren
+      description: Sensoren, die nicht überwacht werden sollen
       default: {entity_id: []}
       selector:
         target:
           entity:
             device_class: battery
+    
+    include_last_updated:
+      name: Letzte Aktualisierung anzeigen
+      description: Zeigt an, wann der Sensor zuletzt aktualisiert wurde
+      default: true
+      selector:
+        boolean: {}
+    
+    include_area:
+      name: Bereich/Raum anzeigen
+      description: Zeigt den Raum/Bereich des Geräts an (falls verfügbar)
+      default: true
+      selector:
+        boolean: {}
+    
     actions:
-      name: Actions
-      description: Notifications or similar to be run. {{sensors}} is replaced with
-        the names of sensors being low on battery.
+      name: Aktionen
+      description: |
+        Benachrichtigungen oder andere Aktionen.
+        Verfügbare Variablen:
+        - {{sensors}} = Einfache Textliste
+        - {{sensors_html}} = HTML-formatiert (für Telegram)
+        - {{sensors_markdown}} = Markdown-formatiert
+        - {{sensors_count}} = Anzahl der Sensoren
+        - {{critical_count}} = Anzahl kritischer Sensoren
       selector:
         action: {}
-  source_url: https://gist.github.com/sbyx/1f6f434f0903b872b84c4302637d0890
+  
+  source_url: https://gist.github.com/sbyx/advanced-battery-monitoring
+
 variables:
   day: !input 'day'
-  threshold: !input 'threshold'
+  threshold_default: !input 'threshold_default'
+  threshold_critical: !input 'threshold_critical'
   exclude: !input 'exclude'
-  sensors: >-
+  custom_thresholds_input: !input 'custom_thresholds'
+  include_last_updated: !input 'include_last_updated'
+  include_area: !input 'include_area'
+  
+  # Parse custom thresholds from simple text format
+  custom_thresholds: >-
+    {% set result = {} %}
+    {% if custom_thresholds_input and custom_thresholds_input != '' %}
+      {% for line in custom_thresholds_input.split('\n') %}
+        {% set line = line.strip() %}
+        {% if line and '=' in line and not line.startswith('#') %}
+          {% set parts = line.split('=') %}
+          {% if parts | length == 2 %}
+            {% set entity = parts[0].strip() %}
+            {% set value = parts[1].strip() | int(0) %}
+            {% if value > 0 %}
+              {% set result = dict(result, **{entity: value}) %}
+            {% endif %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {{ result }}
+  
+  # Sammle alle Low-Battery Sensoren mit Details
+  battery_data: >-
     {% set result = namespace(sensors=[]) %}
+    
+    {# Verarbeite normale Batteriesensoren #}
     {% for state in states.sensor | selectattr('attributes.device_class', '==', 'battery') %}
-      {% if 0 <= state.state | int(-1) < threshold | int and not state.entity_id in exclude.entity_id %}
-        {% set result.sensors = result.sensors + [state.name ~ ' (' ~ state.state ~ ' %)'] %}
+      {% if not state.entity_id in exclude.entity_id %}
+        {% set battery_level = state.state | int(-1) %}
+        {% if battery_level >= 0 %}
+          {# Prüfe auf benutzerdefinierten Schwellwert #}
+          {% set custom_threshold = custom_thresholds.get(state.entity_id, none) %}
+          {% set threshold = custom_threshold | int(threshold_default) if custom_threshold else threshold_default %}
+          
+          {% if battery_level < threshold %}
+            {% set is_critical = battery_level < threshold_critical %}
+            {% set area_name = area_name(state.entity_id) if include_area else none %}
+            {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
+            
+            {% set sensor_info = {
+              'name': state.name,
+              'entity_id': state.entity_id,
+              'level': battery_level,
+              'threshold': threshold,
+              'is_critical': is_critical,
+              'area': area_name,
+              'last_updated': last_updated
+            } %}
+            {% set result.sensors = result.sensors + [sensor_info] %}
+          {% endif %}
+        {% endif %}
       {% endif %}
     {% endfor %}
+    
+    {# Verarbeite binäre Batteriesensoren #}
     {% for state in states.binary_sensor | selectattr('attributes.device_class', '==', 'battery') | selectattr('state', '==', 'on') %}
       {% if not state.entity_id in exclude.entity_id %}
-        {% set result.sensors = result.sensors + [state.name] %}
+        {% set area_name = area_name(state.entity_id) if include_area else none %}
+        {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
+        
+        {% set sensor_info = {
+          'name': state.name,
+          'entity_id': state.entity_id,
+          'level': 0,
+          'threshold': threshold_default,
+          'is_critical': true,
+          'area': area_name,
+          'last_updated': last_updated
+        } %}
+        {% set result.sensors = result.sensors + [sensor_info] %}
       {% endif %}
     {% endfor %}
-    {{result.sensors|join(', ')}}
+    
+    {{ result.sensors }}
+  
+  # Zähler
+  sensors_count: >-
+    {{ battery_data | length }}
+  
+  critical_count: >-
+    {{ battery_data | selectattr('is_critical', '==', true) | list | length }}
+  
+  # EINFACHE TEXTAUSGABE
+  sensors: >-
+    {% if battery_data | length == 0 %}
+      Keine Batteriewarnungen
+    {% else %}
+      {% set critical = battery_data | selectattr('is_critical', '==', true) | list %}
+      {% set low = battery_data | rejectattr('is_critical', '==', true) | list %}
+      
+      {% if critical | length > 0 %}
+        KRITISCH:
+        {% for sensor in critical %}
+          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} ({{ sensor.area }}){% endif %}
+        {% endfor %}
+      {% endif %}
+      
+      {% if low | length > 0 %}
+        {% if critical | length > 0 %}
+
+        {% endif %}NIEDRIG:
+        {% for sensor in low %}
+          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} ({{ sensor.area }}){% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endif %}
+  
+  # HTML-FORMATIERTE AUSGABE (für Telegram)
+  sensors_html: >-
+    {% if battery_data | length == 0 %}
+      ✅ <b>Keine Batteriewarnungen</b>
+    {% else %}
+      {% set critical = battery_data | selectattr('is_critical', '==', true) | list %}
+      {% set low = battery_data | rejectattr('is_critical', '==', true) | list %}
+      
+      <b>🔋 Batterie-Warnung</b>
+      
+      {% if critical | length > 0 %}
+        <b>🚨 KRITISCH ({{ critical | length }}):</b>
+        {% for sensor in critical %}
+          • <b>{{ sensor.name }}</b>: {{ sensor.level }}%
+          {% if sensor.area %}  📍 {{ sensor.area }}{% endif %}
+          {% if sensor.last_updated %}  🕐 {{ sensor.last_updated }}{% endif %}
+        {% endfor %}
+      {% endif %}
+      
+      {% if low | length > 0 %}
+        {% if critical | length > 0 %}
+
+        {% endif %}<b>⚠️ NIEDRIG ({{ low | length }}):</b>
+        {% for sensor in low %}
+          • {{ sensor.name }}: {{ sensor.level }}%
+          {% if sensor.area %}  📍 {{ sensor.area }}{% endif %}
+          {% if sensor.last_updated %}  🕐 {{ sensor.last_updated }}{% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endif %}
+  
+  # MARKDOWN-AUSGABE
+  sensors_markdown: >-
+    {% if battery_data | length == 0 %}
+      ✅ **Keine Batteriewarnungen**
+    {% else %}
+      {% set critical = battery_data | selectattr('is_critical', '==', true) | list %}
+      {% set low = battery_data | rejectattr('is_critical', '==', true) | list %}
+      
+      **🔋 Batterie-Warnung**
+      
+      {% if critical | length > 0 %}
+        **🚨 KRITISCH ({{ critical | length }}):**
+        {% for sensor in critical %}
+          - **{{ sensor.name }}**: {{ sensor.level }}%{% if sensor.area %} (📍 {{ sensor.area }}){% endif %}{% if sensor.last_updated %} - 🕐 {{ sensor.last_updated }}{% endif %}
+        {% endfor %}
+      {% endif %}
+      
+      {% if low | length > 0 %}
+        {% if critical | length > 0 %}
+
+        {% endif %}**⚠️ NIEDRIG ({{ low | length }}):**
+        {% for sensor in low %}
+          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} (📍 {{ sensor.area }}){% endif %}{% if sensor.last_updated %} - 🕐 {{ sensor.last_updated }}{% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endif %}
+
 trigger:
-- platform: time
-  at: !input 'time'
+  - platform: time
+    at: !input 'time'
+
 condition:
-- '{{ sensors != '''' and (day | int == 0 or day | int == now().isoweekday()) }}'
+  - condition: template
+    value_template: '{{ sensors_count > 0 and (day | int == 0 or day | int == now().isoweekday()) }}'
+
 action:
-- choose: []
-  default: !input 'actions'
+  - choose: []
+    default: !input 'actions'
+
 mode: single

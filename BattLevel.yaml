@@ -149,7 +149,11 @@ variables:
         {% if battery_level >= 0 %}
           {# Prüfe auf benutzerdefinierten Schwellwert #}
           {% set custom_threshold = custom_thresholds.get(state.entity_id, none) %}
-          {% set threshold = custom_threshold | int(threshold_default) if custom_threshold else threshold_default %}
+          {% if custom_threshold %}
+            {% set threshold = custom_threshold | int %}
+          {% else %}
+            {% set threshold = threshold_default | int %}
+          {% endif %}
           
           {% if battery_level < threshold %}
             {# Wenn custom threshold gesetzt ist, wird dieser auch für "kritisch" verwendet (halber Wert) #}

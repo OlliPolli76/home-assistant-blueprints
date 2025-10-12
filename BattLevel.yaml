@@ -87,6 +87,18 @@ blueprint:
       selector:
         boolean: {}
     
+    stale_data_days:
+      name: Warnung bei veralteten Daten (Tage)
+      description: Markiert Sensoren als veraltet, wenn sie länger als X Tage nicht aktualisiert wurden (0 = deaktiviert)
+      default: 7
+      selector:
+        number:
+          min: 0
+          max: 30
+          unit_of_measurement: 'Tage'
+          mode: slider
+          step: 1
+    
     include_area:
       name: Bereich/Raum anzeigen
       description: Zeigt den Raum/Bereich des Geräts an (falls verfügbar)
@@ -117,6 +129,7 @@ variables:
   custom_thresholds_input: !input 'custom_thresholds'
   include_last_updated: !input 'include_last_updated'
   include_area: !input 'include_area'
+  stale_data_days: !input 'stale_data_days'
   
   # Parse custom thresholds from simple text format
   custom_thresholds: >-
@@ -165,6 +178,7 @@ variables:
             {% set is_critical = battery_level < effective_critical %}
             {% set area_name = area_name(state.entity_id) if include_area else none %}
             {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
+            {% set is_stale = (stale_data_days > 0 and (now() - state.last_updated).days >= stale_data_days) %}
             
             {% set sensor_info = {
               'name': state.name,
@@ -173,7 +187,8 @@ variables:
               'threshold': threshold,
               'is_critical': is_critical,
               'area': area_name,
-              'last_updated': last_updated
+              'last_updated': last_updated,
+              'is_stale': is_stale
             } %}
             {% set result.sensors = result.sensors + [sensor_info] %}
           {% endif %}
@@ -186,6 +201,7 @@ variables:
       {% if not state.entity_id in exclude.entity_id %}
         {% set area_name = area_name(state.entity_id) if include_area else none %}
         {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
+        {% set is_stale = (stale_data_days > 0 and (now() - state.last_updated).days >= stale_data_days) %}
         
         {% set sensor_info = {
           'name': state.name,
@@ -194,7 +210,8 @@ variables:
           'threshold': threshold_default,
           'is_critical': true,
           'area': area_name,
-          'last_updated': last_updated
+          'last_updated': last_updated,
+          'is_stale': is_stale
         } %}
         {% set result.sensors = result.sensors + [sensor_info] %}
       {% endif %}
@@ -209,6 +226,9 @@ variables:
   critical_count: >-
     {{ battery_data | selectattr('is_critical', '==', true) | list | length }}
   
+  stale_count: >-
+    {{ battery_data | selectattr('is_stale', '==', true) | list | length }}
+  
   # EINFACHE TEXTAUSGABE
   sensors: >-
     {% if battery_data | length == 0 %}
@@ -220,7 +240,7 @@ variables:
       {% if critical | length > 0 %}
         KRITISCH:
         {% for sensor in critical %}
-          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} ({{ sensor.area }}){% endif %}
+          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} ({{ sensor.area }}){% endif %}{% if sensor.is_stale %} [VERALTET!]{% endif %}
         {% endfor %}
       {% endif %}
       
@@ -229,7 +249,7 @@ variables:
 
         {% endif %}NIEDRIG:
         {% for sensor in low %}
-          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} ({{ sensor.area }}){% endif %}
+          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} ({{ sensor.area }}){% endif %}{% if sensor.is_stale %} [VERALTET!]{% endif %}
         {% endfor %}
       {% endif %}
     {% endif %}
@@ -247,7 +267,7 @@ variables:
       {% if critical | length > 0 %}
         <b>🚨 KRITISCH ({{ critical | length }}):</b>
         {% for sensor in critical %}
-          • <b>{{ sensor.name }}</b>: {{ sensor.level }}%
+          • <b>{{ sensor.name }}</b>: {{ sensor.level }}%{% if sensor.is_stale %} ⚠️ <i>VERALTET</i>{% endif %}
           {% if sensor.area %}  📍 {{ sensor.area }}{% endif %}
           {% if sensor.last_updated %}  🕐 {{ sensor.last_updated }}{% endif %}
         {% endfor %}
@@ -258,7 +278,7 @@ variables:
 
         {% endif %}<b>⚠️ NIEDRIG ({{ low | length }}):</b>
         {% for sensor in low %}
-          • {{ sensor.name }}: {{ sensor.level }}%
+          • {{ sensor.name }}: {{ sensor.level }}%{% if sensor.is_stale %} ⚠️ <i>VERALTET</i>{% endif %}
           {% if sensor.area %}  📍 {{ sensor.area }}{% endif %}
           {% if sensor.last_updated %}  🕐 {{ sensor.last_updated }}{% endif %}
         {% endfor %}
@@ -278,7 +298,7 @@ variables:
       {% if critical | length > 0 %}
         **🚨 KRITISCH ({{ critical | length }}):**
         {% for sensor in critical %}
-          - **{{ sensor.name }}**: {{ sensor.level }}%{% if sensor.area %} (📍 {{ sensor.area }}){% endif %}{% if sensor.last_updated %} - 🕐 {{ sensor.last_updated }}{% endif %}
+          - **{{ sensor.name }}**: {{ sensor.level }}%{% if sensor.is_stale %} ⚠️ *VERALTET*{% endif %}{% if sensor.area %} (📍 {{ sensor.area }}){% endif %}{% if sensor.last_updated %} - 🕐 {{ sensor.last_updated }}{% endif %}
         {% endfor %}
       {% endif %}
       
@@ -287,7 +307,7 @@ variables:
 
         {% endif %}**⚠️ NIEDRIG ({{ low | length }}):**
         {% for sensor in low %}
-          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} (📍 {{ sensor.area }}){% endif %}{% if sensor.last_updated %} - 🕐 {{ sensor.last_updated }}{% endif %}
+          - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.is_stale %} ⚠️ *VERALTET*{% endif %}{% if sensor.area %} (📍 {{ sensor.area }}){% endif %}{% if sensor.last_updated %} - 🕐 {{ sensor.last_updated }}{% endif %}
         {% endfor %}
       {% endif %}
     {% endif %}

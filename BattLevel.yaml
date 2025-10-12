@@ -12,7 +12,7 @@ blueprint:
     
   domain: automation
   input:
-    threshold_default:
+    threshold:
       name: Standard-Warnschwelle
       description: Standard-Schwellwert für alle Sensoren ohne spezifische Konfiguration
       default: 20
@@ -111,7 +111,7 @@ blueprint:
 
 variables:
   day: !input 'day'
-  threshold_default: !input 'threshold_default'
+  threshold_default: !input 'threshold'
   threshold_critical: !input 'threshold_critical'
   exclude: !input 'exclude'
   custom_thresholds_input: !input 'custom_thresholds'
@@ -120,23 +120,23 @@ variables:
   
   # Parse custom thresholds from simple text format
   custom_thresholds: >-
-    {% set result = {} %}
+    {% set ns = namespace(result={}) %}
     {% if custom_thresholds_input and custom_thresholds_input != '' %}
       {% for line in custom_thresholds_input.split('\n') %}
         {% set line = line.strip() %}
         {% if line and '=' in line and not line.startswith('#') %}
-          {% set parts = line.split('=') %}
+          {% set parts = line.split('=', 1) %}
           {% if parts | length == 2 %}
             {% set entity = parts[0].strip() %}
             {% set value = parts[1].strip() | int(0) %}
-            {% if value > 0 %}
-              {% set result = dict(result, **{entity: value}) %}
+            {% if value > 0 and entity %}
+              {% set ns.result = dict(ns.result, **{entity: value}) %}
             {% endif %}
           {% endif %}
         {% endif %}
       {% endfor %}
     {% endif %}
-    {{ result }}
+    {{ ns.result }}
   
   # Sammle alle Low-Battery Sensoren mit Details
   battery_data: >-

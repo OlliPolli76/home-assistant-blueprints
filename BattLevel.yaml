@@ -221,21 +221,24 @@ variables:
   
   # Zähler
   sensors_count: >-
-    {{ battery_data | length }}
+    {{ battery_data.sensors | length }}
   
   critical_count: >-
-    {{ battery_data | selectattr('is_critical', '==', true) | list | length }}
+    {{ battery_data.sensors | selectattr('is_critical', '==', true) | list | length }}
   
   stale_count: >-
-    {{ battery_data | selectattr('is_stale', '==', true) | list | length }}
+    {{ battery_data.sensors | selectattr('is_stale', '==', true) | list | length }}
+  
+  offline_count: >-
+    {{ battery_data.offline | length }}
   
   # EINFACHE TEXTAUSGABE
   sensors: >-
-    {% if battery_data | length == 0 %}
+    {% if battery_data.sensors | length == 0 and battery_data.offline | length == 0 %}
       Keine Batteriewarnungen
     {% else %}
-      {% set critical = battery_data | selectattr('is_critical', '==', true) | list %}
-      {% set low = battery_data | rejectattr('is_critical', '==', true) | list %}
+      {% set critical = battery_data.sensors | selectattr('is_critical', '==', true) | list %}
+      {% set low = battery_data.sensors | rejectattr('is_critical', '==', true) | list %}
       
       {% if critical | length > 0 %}
         KRITISCH:
@@ -252,15 +255,24 @@ variables:
           - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.area %} ({{ sensor.area }}){% endif %}{% if sensor.is_stale %} [VERALTET!]{% endif %}
         {% endfor %}
       {% endif %}
+      
+      {% if battery_data.offline | length > 0 %}
+        {% if critical | length > 0 or low | length > 0 %}
+
+        {% endif %}OFFLINE:
+        {% for sensor in battery_data.offline %}
+          - {{ sensor.name }}{% if sensor.area %} ({{ sensor.area }}){% endif %} [{{ sensor.state }}]
+        {% endfor %}
+      {% endif %}
     {% endif %}
   
   # HTML-FORMATIERTE AUSGABE (für Telegram)
   sensors_html: >-
-    {% if battery_data | length == 0 %}
+    {% if battery_data.sensors | length == 0 and battery_data.offline | length == 0 %}
       ✅ <b>Keine Batteriewarnungen</b>
     {% else %}
-      {% set critical = battery_data | selectattr('is_critical', '==', true) | list %}
-      {% set low = battery_data | rejectattr('is_critical', '==', true) | list %}
+      {% set critical = battery_data.sensors | selectattr('is_critical', '==', true) | list %}
+      {% set low = battery_data.sensors | rejectattr('is_critical', '==', true) | list %}
       
       <b>🔋 Batterie-Warnung</b>
       
@@ -283,15 +295,26 @@ variables:
           {% if sensor.last_updated %}  🕐 {{ sensor.last_updated }}{% endif %}
         {% endfor %}
       {% endif %}
+      
+      {% if battery_data.offline | length > 0 %}
+        {% if critical | length > 0 or low | length > 0 %}
+
+        {% endif %}<b>📵 OFFLINE ({{ battery_data.offline | length }}):</b>
+        {% for sensor in battery_data.offline %}
+          • <b>{{ sensor.name }}</b>
+          {% if sensor.area %}  📍 {{ sensor.area }}{% endif %}
+            <i>({{ sensor.state }})</i>
+        {% endfor %}
+      {% endif %}
     {% endif %}
   
   # MARKDOWN-AUSGABE
   sensors_markdown: >-
-    {% if battery_data | length == 0 %}
+    {% if battery_data.sensors | length == 0 and battery_data.offline | length == 0 %}
       ✅ **Keine Batteriewarnungen**
     {% else %}
-      {% set critical = battery_data | selectattr('is_critical', '==', true) | list %}
-      {% set low = battery_data | rejectattr('is_critical', '==', true) | list %}
+      {% set critical = battery_data.sensors | selectattr('is_critical', '==', true) | list %}
+      {% set low = battery_data.sensors | rejectattr('is_critical', '==', true) | list %}
       
       **🔋 Batterie-Warnung**
       
@@ -310,6 +333,15 @@ variables:
           - {{ sensor.name }}: {{ sensor.level }}%{% if sensor.is_stale %} ⚠️ *VERALTET*{% endif %}{% if sensor.area %} (📍 {{ sensor.area }}){% endif %}{% if sensor.last_updated %} - 🕐 {{ sensor.last_updated }}{% endif %}
         {% endfor %}
       {% endif %}
+      
+      {% if battery_data.offline | length > 0 %}
+        {% if critical | length > 0 or low | length > 0 %}
+
+        {% endif %}**📵 OFFLINE ({{ battery_data.offline | length }}):**
+        {% for sensor in battery_data.offline %}
+          - **{{ sensor.name }}**{% if sensor.area %} (📍 {{ sensor.area }}){% endif %} *({{ sensor.state }})*
+        {% endfor %}
+      {% endif %}
     {% endif %}
 
 trigger:
@@ -318,7 +350,7 @@ trigger:
 
 condition:
   - condition: template
-    value_template: '{{ sensors_count > 0 and (day | int == 0 or day | int == now().isoweekday()) }}'
+    value_template: '{{ (sensors_count > 0 or offline_count > 0) and (day | int == 0 or day | int == now().isoweekday()) }}'
 
 action:
   - choose: []

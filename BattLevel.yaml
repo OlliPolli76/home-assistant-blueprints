@@ -1,5 +1,5 @@
 blueprint:
-  name: Advanced Low Battery Detection with Custom Thresholds
+  name: Advanced Low Battery Detection with Custom Thresholds V1.1
   description: |
     Überwacht alle Batteriesensoren mit individuell konfigurierbaren Schwellwerten 
     und bietet mehrere Ausgabeformate (Text, HTML, Markdown) für verschiedene 
@@ -130,6 +130,26 @@ variables:
   include_last_updated: !input 'include_last_updated'
   include_area: !input 'include_area'
   stale_data_days: !input 'stale_data_days'
+  
+  # Parse custom thresholds from simple text format
+  custom_thresholds: >-
+    {% set ns = namespace(result={}) %}
+    {% if custom_thresholds_input and custom_thresholds_input != '' %}
+      {% for line in custom_thresholds_input.split('\n') %}
+        {% set line = line.strip() %}
+        {% if line and '=' in line and not line.startswith('#') %}
+          {% set parts = line.split('=', 1) %}
+          {% if parts | length == 2 %}
+            {% set entity = parts[0].strip() %}
+            {% set value = parts[1].strip() | int(0) %}
+            {% if value > 0 and entity %}
+              {% set ns.result = dict(ns.result, **{entity: value}) %}
+            {% endif %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {{ ns.result }}
   
   # Parse custom thresholds from simple text format
   custom_thresholds: >-

@@ -1,16 +1,22 @@
 blueprint:
-  name: Advanced Low Battery Detection with Custom Thresholds V1.1
+  name: Advanced Battery Monitor Pro v1.1.0
   description: |
-    Überwacht alle Batteriesensoren mit individuell konfigurierbaren Schwellwerten 
-    und bietet mehrere Ausgabeformate (Text, HTML, Markdown) für verschiedene 
-    Benachrichtigungskanäle.
+    Überwacht alle Batteriesensoren mit individuell konfigurierbaren Schwellwerten,
+    mehreren Ausgabeformaten und Erkennung veralteter/offline Daten.
     
-    **Setup:**
-    1. Erstelle Input-Number-Helper für benutzerdefinierte Schwellwerte
-    2. Benenne sie z.B.: input_number.battery_threshold_smartphone
-    3. Referenziere diese Helper in der "Custom Thresholds" Konfiguration
+    Version: 1.1.0
+    
+    Features:
+    - Individuelle Schwellwerte pro Gerät
+    - Kritische und Warnstufen
+    - Mehrere Ausgabeformate (Text, HTML, Markdown)
+    - Erkennung veralteter Sensor-Daten
+    - Erkennung offline/nicht erreichbarer Sensoren
+    - Bereich/Raum-Anzeige
+    - Zeitstempel der letzten Aktualisierung
     
   domain: automation
+  source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/advanced_battery_monitor_pro.yaml
   input:
     threshold_default:
       name: Standard-Warnschwelle
@@ -114,12 +120,12 @@ blueprint:
         - {{sensors}} = Einfache Textliste
         - {{sensors_html}} = HTML-formatiert (für Telegram)
         - {{sensors_markdown}} = Markdown-formatiert
-        - {{sensors_count}} = Anzahl der Sensoren
+        - {{sensors_count}} = Anzahl aller Sensoren mit niedrigem Batteriestand
         - {{critical_count}} = Anzahl kritischer Sensoren
+        - {{stale_count}} = Anzahl veralteter Sensoren
+        - {{offline_count}} = Anzahl offline/nicht erreichbarer Sensoren
       selector:
         action: {}
-  
-  source_url: https://gist.github.com/sbyx/advanced-battery-monitoring
 
 variables:
   day: !input 'day'
@@ -151,86 +157,59 @@ variables:
     {% endif %}
     {{ ns.result }}
   
-  # Parse custom thresholds from simple text format
-  custom_thresholds: >-
-    {% set ns = namespace(result={}) %}
-    {% if custom_thresholds_input and custom_thresholds_input != '' %}
-      {% for line in custom_thresholds_input.split('\n') %}
-        {% set line = line.strip() %}
-        {% if line and '=' in line and not line.startswith('#') %}
-          {% set parts = line.split('=', 1) %}
-          {% if parts | length == 2 %}
-            {% set entity = parts[0].strip() %}
-            {% set value = parts[1].strip() | int(0) %}
-            {% if value > 0 and entity %}
-              {% set ns.result = dict(ns.result, **{entity: value}) %}
-            {% endif %}
-          {% endif %}
-        {% endif %}
-      {% endfor %}
-    {% endif %}
-    {{ ns.result }}
-  
-  # Parse custom thresholds from simple text format
-  custom_thresholds: >-
-    {% set ns = namespace(result={}) %}
-    {% if custom_thresholds_input and custom_thresholds_input != '' %}
-      {% for line in custom_thresholds_input.split('\n') %}
-        {% set line = line.strip() %}
-        {% if line and '=' in line and not line.startswith('#') %}
-          {% set parts = line.split('=', 1) %}
-          {% if parts | length == 2 %}
-            {% set entity = parts[0].strip() %}
-            {% set value = parts[1].strip() | int(0) %}
-            {% if value > 0 and entity %}
-              {% set ns.result = dict(ns.result, **{entity: value}) %}
-            {% endif %}
-          {% endif %}
-        {% endif %}
-      {% endfor %}
-    {% endif %}
-    {{ ns.result }}
-  
   # Sammle alle Low-Battery Sensoren mit Details
   battery_data: >-
-    {% set result = namespace(sensors=[]) %}
+    {% set result = namespace(sensors=[], offline=[]) %}
     
     {# Verarbeite normale Batteriesensoren #}
     {% for state in states.sensor | selectattr('attributes.device_class', '==', 'battery') %}
       {% if not state.entity_id in exclude.entity_id %}
-        {% set battery_level = state.state | int(-1) %}
-        {% if battery_level >= 0 %}
-          {# Prüfe auf benutzerdefinierten Schwellwert #}
-          {% set custom_threshold = custom_thresholds.get(state.entity_id, none) %}
-          {% if custom_threshold %}
-            {% set threshold = custom_threshold | int %}
-          {% else %}
-            {% set threshold = threshold_default | int %}
-          {% endif %}
-          
-          {% if battery_level < threshold %}
-            {# Wenn custom threshold gesetzt ist, wird dieser auch für "kritisch" verwendet (halber Wert) #}
+        {# Prüfe ob Sensor offline ist #}
+        {% if state.state in ['unavailable', 'unknown'] %}
+          {% set area_name = area_name(state.entity_id) if include_area else none %}
+          {% set offline_info = {
+            'name': state.name,
+            'entity_id': state.entity_id,
+            'state': state.state,
+            'area': area_name
+          } %}
+          {% set result.offline = result.offline + [offline_info] %}
+        {% else %}
+          {# Sensor ist online, prüfe Batterielevel #}
+          {% set battery_level = state.state | int(-1) %}
+          {% if battery_level >= 0 %}
+            {# Prüfe auf benutzerdefinierten Schwellwert #}
+            {% set custom_threshold = custom_thresholds.get(state.entity_id, none) %}
             {% if custom_threshold %}
-              {% set effective_critical = (custom_threshold / 2) | int %}
+              {% set threshold = custom_threshold | int %}
             {% else %}
-              {% set effective_critical = threshold_critical %}
+              {% set threshold = threshold_default | int %}
             {% endif %}
-            {% set is_critical = battery_level < effective_critical %}
-            {% set area_name = area_name(state.entity_id) if include_area else none %}
-            {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
-            {% set is_stale = (stale_data_days > 0 and (now() - state.last_updated).days >= stale_data_days) %}
             
-            {% set sensor_info = {
-              'name': state.name,
-              'entity_id': state.entity_id,
-              'level': battery_level,
-              'threshold': threshold,
-              'is_critical': is_critical,
-              'area': area_name,
-              'last_updated': last_updated,
-              'is_stale': is_stale
-            } %}
-            {% set result.sensors = result.sensors + [sensor_info] %}
+            {% if battery_level < threshold %}
+              {# Wenn custom threshold gesetzt ist, wird dieser auch für "kritisch" verwendet (halber Wert) #}
+              {% if custom_threshold %}
+                {% set effective_critical = (custom_threshold / 2) | int %}
+              {% else %}
+                {% set effective_critical = threshold_critical %}
+              {% endif %}
+              {% set is_critical = battery_level < effective_critical %}
+              {% set area_name = area_name(state.entity_id) if include_area else none %}
+              {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
+              {% set is_stale = (stale_data_days > 0 and (now() - state.last_updated).days >= stale_data_days) %}
+              
+              {% set sensor_info = {
+                'name': state.name,
+                'entity_id': state.entity_id,
+                'level': battery_level,
+                'threshold': threshold,
+                'is_critical': is_critical,
+                'area': area_name,
+                'last_updated': last_updated,
+                'is_stale': is_stale
+              } %}
+              {% set result.sensors = result.sensors + [sensor_info] %}
+            {% endif %}
           {% endif %}
         {% endif %}
       {% endif %}
@@ -239,25 +218,38 @@ variables:
     {# Verarbeite binäre Batteriesensoren #}
     {% for state in states.binary_sensor | selectattr('attributes.device_class', '==', 'battery') | selectattr('state', '==', 'on') %}
       {% if not state.entity_id in exclude.entity_id %}
-        {% set area_name = area_name(state.entity_id) if include_area else none %}
-        {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
-        {% set is_stale = (stale_data_days > 0 and (now() - state.last_updated).days >= stale_data_days) %}
-        
-        {% set sensor_info = {
-          'name': state.name,
-          'entity_id': state.entity_id,
-          'level': 0,
-          'threshold': threshold_default,
-          'is_critical': true,
-          'area': area_name,
-          'last_updated': last_updated,
-          'is_stale': is_stale
-        } %}
-        {% set result.sensors = result.sensors + [sensor_info] %}
+        {# Prüfe ob Sensor offline ist #}
+        {% if state.state in ['unavailable', 'unknown'] %}
+          {% set area_name = area_name(state.entity_id) if include_area else none %}
+          {% set offline_info = {
+            'name': state.name,
+            'entity_id': state.entity_id,
+            'state': state.state,
+            'area': area_name
+          } %}
+          {% set result.offline = result.offline + [offline_info] %}
+        {% else %}
+          {# Binary sensor ist online und "on" = low battery #}
+          {% set area_name = area_name(state.entity_id) if include_area else none %}
+          {% set last_updated = state.last_updated.strftime('%d.%m %H:%M') if include_last_updated else none %}
+          {% set is_stale = (stale_data_days > 0 and (now() - state.last_updated).days >= stale_data_days) %}
+          
+          {% set sensor_info = {
+            'name': state.name,
+            'entity_id': state.entity_id,
+            'level': 0,
+            'threshold': threshold_default,
+            'is_critical': true,
+            'area': area_name,
+            'last_updated': last_updated,
+            'is_stale': is_stale
+          } %}
+          {% set result.sensors = result.sensors + [sensor_info] %}
+        {% endif %}
       {% endif %}
     {% endfor %}
     
-    {{ result.sensors }}
+    {{ {'sensors': result.sensors, 'offline': result.offline} }}
   
   # Zähler
   sensors_count: >-

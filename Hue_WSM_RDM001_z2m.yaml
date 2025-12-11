@@ -1,9 +1,9 @@
 blueprint:
-  name: Hue Wall Module – v20.6
+  name: Hue Wall Module – v20.7
   description: >
-    DE: Steuert Hue-Leuchten über ein Wandmodul. Verbesserte v20.6 ohne Cover/Doppelklick.
+    DE: Steuert Hue-Leuchten über ein Wandmodul. Verbesserte v20.x ohne Cover/Doppelklick.
     EN: Controls Hue lights via wall module. Improved v20.x without cover/double-click.
-    Version v20.6 – Bilingual labels, English code comments and debug messages.
+    Version v20.7 – Efficient triggering with specific MQTT topic.
   domain: automation
   source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/main/hue_v20.yaml
   author: OlliPolli76
@@ -12,21 +12,37 @@ blueprint:
     switch_device:
       name: Hue Wall Switch (Z2M) | Hue Wandschalter (Z2M)
       description: >
-        EN: Select the Zigbee wall module integrated via MQTT. The MQTT topic is automatically detected from the device.
+        EN: Select the Zigbee wall module integrated via MQTT.
+        The device name shown here is needed for the MQTT topic below!
         
-        DE: Wähle das Zigbee-Wandmodul, das über MQTT eingebunden ist. Der MQTT-Topic wird automatisch aus dem Device erkannt.
+        DE: Wähle das Zigbee-Wandmodul, das über MQTT eingebunden ist.
+        Der hier angezeigte Device-Name wird für den MQTT-Topic unten benötigt!
       selector:
         device:
           integration: mqtt
 
+    trigger_topic:
+      name: MQTT Trigger Topic | MQTT Trigger Topic
+      description: >
+        EN: Enter the exact MQTT topic for this wall switch.
+        Format: zigbee2mqtt/DEVICENAME/action
+        Example: zigbee2mqtt/WSM_WC/action
+        → Use the device name shown above in "Hue Wall Switch"
+        
+        DE: Gib den exakten MQTT-Topic für diesen Wandschalter ein.
+        Format: zigbee2mqtt/DEVICENAME/action
+        Beispiel: zigbee2mqtt/WSM_WC/action
+        → Nutze den Device-Namen von oben bei "Hue Wandschalter"
+      selector:
+        text:
+          multiline: false
+
     z2m_friendly_name:
       name: Zigbee2MQTT Friendly Name (optional)
       description: >
-        EN: Only fill in if automatic detection doesn't work. Enter the exact friendly name as configured in Zigbee2MQTT.
-        Example: "living_room_switch" for topic "zigbee2mqtt/living_room_switch/action"
+        EN: Optional backup for device check. Normally not needed anymore.
         
-        DE: Nur ausfüllen, wenn die automatische Erkennung nicht funktioniert. Gib hier den exakten Friendly Name ein, wie er in Zigbee2MQTT konfiguriert ist.
-        Beispiel: "wohnzimmer_schalter" für Topic "zigbee2mqtt/wohnzimmer_schalter/action"
+        DE: Optionale Absicherung für Device-Check. Normalerweise nicht mehr nötig.
       default: ""
       selector:
         text:
@@ -172,7 +188,7 @@ blueprint:
 
 trigger:
   - platform: mqtt
-    topic: "zigbee2mqtt/+/action"
+    topic: !input trigger_topic
 
 mode: restart
 max_exceeded: silent

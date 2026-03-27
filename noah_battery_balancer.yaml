@@ -1,1 +1,632 @@
-test
+
+blueprint:
+  name: Noah Battery Balancer
+  description: |
+    Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
+    Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
+    
+    Intelligent load management for up to 6 Growatt Noah 2000 battery storage units.
+    Balances SOC differences via throttling, optimizes grid consumption and controls DTU for zero feed-in.
+  
+  domain: automation
+  
+  source_url: https://raw.githubusercontent.com/OlliPolli76/home-assistant-blueprints/refs/heads/main/noah_battery_balancer.yaml
+  
+  author: OlliPolli
+  
+  homeassistant:
+    min_version: 2024.1.0
+  
+  input:
+    # ========== Noah Battery Units (1-6) ==========
+    noah_1_soc:
+      name: Noah 1 - SOC Sensor
+      description: State of Charge Sensor für Noah 1 (0-100%)
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    
+    noah_1_power:
+      name: Noah 1 - Output Power
+      description: Output Power Steuerung für Noah 1 (0-800W)
+      selector:
+        entity:
+          filter:
+            - domain: number
+    
+    noah_2_soc:
+      name: Noah 2 - SOC Sensor
+      description: State of Charge Sensor für Noah 2 (0-100%)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    
+    noah_2_power:
+      name: Noah 2 - Output Power
+      description: Output Power Steuerung für Noah 2 (0-800W)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: number
+    
+    noah_3_soc:
+      name: Noah 3 - SOC Sensor
+      description: State of Charge Sensor für Noah 3 (0-100%)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    
+    noah_3_power:
+      name: Noah 3 - Output Power
+      description: Output Power Steuerung für Noah 3 (0-800W)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: number
+    
+    noah_4_soc:
+      name: Noah 4 - SOC Sensor
+      description: State of Charge Sensor für Noah 4 (0-100%)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    
+    noah_4_power:
+      name: Noah 4 - Output Power
+      description: Output Power Steuerung für Noah 4 (0-800W)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: number
+    
+    noah_5_soc:
+      name: Noah 5 - SOC Sensor
+      description: State of Charge Sensor für Noah 5 (0-100%)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    
+    noah_5_power:
+      name: Noah 5 - Output Power
+      description: Output Power Steuerung für Noah 5 (0-800W)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: number
+    
+    noah_6_soc:
+      name: Noah 6 - SOC Sensor
+      description: State of Charge Sensor für Noah 6 (0-100%)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    
+    noah_6_power:
+      name: Noah 6 - Output Power
+      description: Output Power Steuerung für Noah 6 (0-800W)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: number
+    
+    # ========== SOC Thresholds ==========
+    max_soc:
+      name: Max SOC (Drosselung)
+      description: |
+        SOC-Schwelle für Drosselung (Standard: 95%).
+        Batterien über diesem Wert bleiben aktiv, alle anderen werden gedrosselt.
+        
+        SOC threshold for throttling (default: 95%).
+        Batteries above this value stay active, all others will be throttled.
+      default: 95
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+    
+    min_soc:
+      name: Min SOC (Freigabe)
+      description: |
+        SOC-Schwelle für Freigabe (Standard: 85%).
+        Wenn gedrosselte Batterie unter diesen Wert fällt UND keine andere über Max SOC, wird freigegeben.
+        
+        SOC threshold for release (default: 85%).
+        When throttled battery falls below this AND no other above Max SOC, it will be released.
+      default: 85
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+    
+    # ========== Power Settings ==========
+    min_output_power:
+      name: Min Output Power
+      description: |
+        Minimale Ausgangsleistung beim Drosseln (Standard: 20W).
+        
+        Minimum output power when throttling (default: 20W).
+      default: 20
+      selector:
+        number:
+          min: 0
+          max: 800
+          step: 10
+          unit_of_measurement: "W"
+          mode: box
+    
+    max_output_power:
+      name: Max Output Power
+      description: |
+        Maximale Ausgangsleistung im Normalbetrieb (Standard: 800W).
+        
+        Maximum output power in normal operation (default: 800W).
+      default: 800
+      selector:
+        number:
+          min: 0
+          max: 800
+          step: 10
+          unit_of_measurement: "W"
+          mode: box
+    
+    # ========== Grid Override (Optional) ==========
+    netzbezug_enabled:
+      name: Netzbezug-Override aktivieren
+      description: |
+        Aktiviert Notfall-Modus bei hohem Netzbezug.
+        Alle Batterien werden auf Max Power gesetzt wenn Schwelle überschritten.
+        
+        Enables emergency mode for high grid consumption.
+        All batteries set to max power when threshold exceeded.
+      default: false
+      selector:
+        boolean:
+    
+    netzbezug_sensor:
+      name: Netzbezug-Sensor
+      description: Sensor für aktuelle Netzleistung (positiv = Verbrauch)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: power
+    
+    netzbezug_threshold:
+      name: Netzbezug-Schwelle
+      description: Netzbezug-Schwelle in Watt für Override (Standard: 2000W)
+      default: 2000
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 100
+          unit_of_measurement: "W"
+          mode: box
+    
+    netzbezug_duration:
+      name: Netzbezug-Verzögerung
+      description: Wie lange muss Schwelle überschritten sein (Sekunden)
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 5
+          unit_of_measurement: "s"
+          mode: box
+    
+    netzbezug_min_soc:
+      name: Netzbezug Min SOC
+      description: Minimaler SOC für Override (Standard: 20%)
+      default: 20
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+    
+    # ========== DTU Solar Optimizer (Optional) ==========
+    dtu_enabled:
+      name: DTU Solar-Optimizer aktivieren
+      description: |
+        Aktiviert automatische DTU-Steuerung vor Sonnenuntergang.
+        Bei allen Noah 100% → Einspeisung bis Platz für letzte Sonnenstunden.
+        
+        Enables automatic DTU control before sunset.
+        When all Noah 100% → feed-in until space for last sun hours.
+      default: false
+      selector:
+        boolean:
+    
+    dtu_mode_select:
+      name: DTU DPL Mode Select
+      description: Select-Entity für Dynamic Power Limiter Mode (0=aktiv, 1=aus, 2=deaktiviert)
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: select
+    
+    hours_before_sunset:
+      name: Stunden vor Sonnenuntergang
+      description: |
+        Ab wie vielen Stunden vor Sonnenuntergang soll DTU auf Einspeisung schalten (Standard: 2h).
+        
+        How many hours before sunset should DTU switch to feed-in mode (default: 2h).
+      default: 2
+      selector:
+        number:
+          min: 0.5
+          max: 6
+          step: 0.5
+          unit_of_measurement: "h"
+          mode: slider
+    
+    feed_in_output_power:
+      name: Einspeisung Output Power
+      description: |
+        Output Power während Einspeisung (DPL Mode 2).
+        Standard: 400W pro Noah.
+        
+        Output power during feed-in (DPL Mode 2).
+        Default: 400W per Noah.
+      default: 400
+      selector:
+        number:
+          min: 0
+          max: 800
+          step: 50
+          unit_of_measurement: "W"
+          mode: box
+    
+    # ========== Notifications (Optional) ==========
+    notification_service:
+      name: Benachrichtigungs-Service
+      description: |
+        Optional: Service für Benachrichtigungen (z.B. notify.telegram_bot_xxx).
+        Leer lassen für keine Benachrichtigungen.
+        
+        Optional: Notification service (e.g. notify.telegram_bot_xxx).
+        Leave empty for no notifications.
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: notify
+    
+    additional_actions:
+      name: Zusätzliche Aktionen
+      description: |
+        Optional: Zusätzliche Aktionen die nach jeder Balancing-Aktion ausgeführt werden.
+        
+        Optional: Additional actions to execute after each balancing action.
+      default: []
+      selector:
+        action:
+
+# ========== VARIABLES ==========
+variables:
+  # Noah-Konfiguration sammeln
+  noah_units: |
+    {%- set units = [] -%}
+    {%- if noah_1_soc != [] and noah_1_power != [] -%}
+      {%- set units = units + [{'soc': noah_1_soc, 'power': noah_1_power, 'name': 'Noah 1'}] -%}
+    {%- endif -%}
+    {%- if noah_2_soc != [] and noah_2_power != [] -%}
+      {%- set units = units + [{'soc': noah_2_soc, 'power': noah_2_power, 'name': 'Noah 2'}] -%}
+    {%- endif -%}
+    {%- if noah_3_soc != [] and noah_3_power != [] -%}
+      {%- set units = units + [{'soc': noah_3_soc, 'power': noah_3_power, 'name': 'Noah 3'}] -%}
+    {%- endif -%}
+    {%- if noah_4_soc != [] and noah_4_power != [] -%}
+      {%- set units = units + [{'soc': noah_4_soc, 'power': noah_4_power, 'name': 'Noah 4'}] -%}
+    {%- endif -%}
+    {%- if noah_5_soc != [] and noah_5_power != [] -%}
+      {%- set units = units + [{'soc': noah_5_soc, 'power': noah_5_power, 'name': 'Noah 5'}] -%}
+    {%- endif -%}
+    {%- if noah_6_soc != [] and noah_6_power != [] -%}
+      {%- set units = units + [{'soc': noah_6_soc, 'power': noah_6_power, 'name': 'Noah 6'}] -%}
+    {%- endif -%}
+    {{ units }}
+  
+  # Alle SOC-Werte sammeln
+  all_soc_values: |
+    {{ noah_units | map(attribute='soc') | map('states') | map('float', 0) | list }}
+  
+  # Prüfen ob alle Noah 100%
+  all_at_100: |
+    {{ all_soc_values | min >= 100 }}
+  
+  # Prüfen ob mindestens einer unter 100%
+  any_below_100: |
+    {{ all_soc_values | min < 100 }}
+  
+  # Zeit bis Sonnenuntergang in Stunden
+  hours_until_sunset: |
+    {% set sunset = state_attr('sun.sun', 'next_setting') | as_datetime %}
+    {% set now = now() %}
+    {{ (sunset - now).total_seconds() / 3600 }}
+
+# ========== TRIGGER ==========
+trigger:
+  # Trigger auf alle konfigurierten Noah SOC-Änderungen
+  - platform: state
+    entity_id: !input noah_1_soc
+    id: noah_soc_change
+  
+  - platform: state
+    entity_id: !input noah_2_soc
+    id: noah_soc_change
+  
+  - platform: state
+    entity_id: !input noah_3_soc
+    id: noah_soc_change
+  
+  - platform: state
+    entity_id: !input noah_4_soc
+    id: noah_soc_change
+  
+  - platform: state
+    entity_id: !input noah_5_soc
+    id: noah_soc_change
+  
+  - platform: state
+    entity_id: !input noah_6_soc
+    id: noah_soc_change
+  
+  # Netzbezug-Trigger (wenn konfiguriert)
+  - platform: numeric_state
+    entity_id: !input netzbezug_sensor
+    above: !input netzbezug_threshold
+    for:
+      seconds: !input netzbezug_duration
+    id: netzbezug_override
+  
+  # DTU Mode-Trigger (für manuelle Rückkehr zu Auto)
+  - platform: state
+    entity_id: !input dtu_mode_select
+    id: dtu_mode_change
+
+# ========== CONDITIONS ==========
+condition: []
+
+# ========== ACTIONS ==========
+action:
+  # ========== PRIO 1: DTU Solar-Optimizer ==========
+  - if:
+      - condition: template
+        value_template: "{{ dtu_enabled }}"
+      - condition: template
+        value_template: "{{ all_at_100 }}"
+      - condition: template
+        value_template: "{{ hours_until_sunset < hours_before_sunset }}"
+      - condition: template
+        value_template: "{{ dtu_mode_select != [] }}"
+    then:
+      # DTU Mode auf 2 (deaktiviert = Einspeisung)
+      - action: select.select_option
+        target:
+          entity_id: !input dtu_mode_select
+        data:
+          option: "2"
+      
+      # Alle Noah auf Einspeisung-Power setzen
+      - repeat:
+          count: "{{ noah_units | length }}"
+          sequence:
+            - action: number.set_value
+              target:
+                entity_id: "{{ noah_units[repeat.index - 1].power }}"
+              data:
+                value: !input feed_in_output_power
+      
+      # Benachrichtigung
+      - if:
+          - condition: template
+            value_template: "{{ notification_service != [] }}"
+        then:
+          - action: "{{ notification_service }}"
+            data:
+              message: "DTU Solar-Optimizer: Alle Noah 100%, Einspeisung aktiv ({{ hours_until_sunset | round(1) }}h bis Sonnenuntergang)"
+      
+      # Zusätzliche Aktionen
+      - if:
+          - condition: template
+            value_template: "{{ additional_actions != [] }}"
+        then:
+          - choose:
+              - conditions: []
+                sequence: !input additional_actions
+      
+      # STOP - keine weitere Logik
+      - stop: "DTU Solar-Optimizer aktiv"
+  
+  # DTU Rückschaltung: Wenn Mode 2 aktiv und mindestens ein Noah < 100%
+  - if:
+      - condition: template
+        value_template: "{{ dtu_enabled }}"
+      - condition: template
+        value_template: "{{ dtu_mode_select != [] }}"
+      - condition: state
+        entity_id: !input dtu_mode_select
+        state: "2"
+      - condition: template
+        value_template: "{{ any_below_100 }}"
+    then:
+      # DTU Mode zurück auf 0 (aktiv)
+      - action: select.select_option
+        target:
+          entity_id: !input dtu_mode_select
+        data:
+          option: "0"
+      
+      # Benachrichtigung
+      - if:
+          - condition: template
+            value_template: "{{ notification_service != [] }}"
+        then:
+          - action: "{{ notification_service }}"
+            data:
+              message: "DTU zurück auf Auto-Modus (mindestens ein Noah < 100%)"
+  
+  # ========== PRIO 2: Netzbezug-Override ==========
+  - if:
+      - condition: template
+        value_template: "{{ netzbezug_enabled }}"
+      - condition: template
+        value_template: "{{ netzbezug_sensor != [] }}"
+      - condition: numeric_state
+        entity_id: !input netzbezug_sensor
+        above: !input netzbezug_threshold
+      - condition: template
+        value_template: "{{ all_soc_values | min >= netzbezug_min_soc }}"
+    then:
+      # Alle Noah auf Max Power
+      - repeat:
+          count: "{{ noah_units | length }}"
+          sequence:
+            - action: number.set_value
+              target:
+                entity_id: "{{ noah_units[repeat.index - 1].power }}"
+              data:
+                value: !input max_output_power
+      
+      # Benachrichtigung
+      - if:
+          - condition: template
+            value_template: "{{ notification_service != [] }}"
+        then:
+          - action: "{{ notification_service }}"
+            data:
+              message: "Netzbezug-Override: Alle Noah auf Max Power ({{ states(netzbezug_sensor) | float | round(0) }}W Netzbezug)"
+      
+      # Zusätzliche Aktionen
+      - if:
+          - condition: template
+            value_template: "{{ additional_actions != [] }}"
+        then:
+          - choose:
+              - conditions: []
+                sequence: !input additional_actions
+      
+      # STOP
+      - stop: "Netzbezug-Override aktiv"
+  
+  # ========== PRIO 3: Loadbalancing ==========
+  # Für jeden Noah prüfen ob er über max_soc liegt
+  - repeat:
+      count: "{{ noah_units | length }}"
+      sequence:
+        - variables:
+            current_noah: "{{ noah_units[repeat.index - 1] }}"
+            current_soc: "{{ states(current_noah.soc) | float(0) }}"
+        
+        # Wenn dieser Noah >= max_soc: Alle ANDEREN drosseln
+        - if:
+            - condition: template
+              value_template: "{{ current_soc >= max_soc }}"
+          then:
+            # Alle anderen Noah drosseln
+            - repeat:
+                count: "{{ noah_units | length }}"
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ repeat.index - 1 != loop.index - 1 }}"
+                    then:
+                      - action: number.set_value
+                        target:
+                          entity_id: "{{ noah_units[repeat.index - 1].power }}"
+                        data:
+                          value: !input min_output_power
+            
+            # Benachrichtigung
+            - if:
+                - condition: template
+                  value_template: "{{ notification_service != [] }}"
+              then:
+                - action: "{{ notification_service }}"
+                  data:
+                    message: "Loadbalancing: {{ current_noah.name }} >= {{ max_soc }}%, andere gedrosselt"
+        
+        # Wenn dieser Noah <= min_soc UND kein anderer >= max_soc: Freigeben
+        - if:
+            - condition: template
+              value_template: "{{ current_soc <= min_soc }}"
+            - condition: template
+              value_template: |
+                {% set others_above_max = namespace(found=false) %}
+                {% for unit in noah_units %}
+                  {% if unit.soc != current_noah.soc and states(unit.soc) | float(0) >= max_soc %}
+                    {% set others_above_max.found = true %}
+                  {% endif %}
+                {% endfor %}
+                {{ not others_above_max.found }}
+          then:
+            # Diesen Noah freigeben
+            - action: number.set_value
+              target:
+                entity_id: "{{ current_noah.power }}"
+              data:
+                value: !input max_output_power
+            
+            # Benachrichtigung
+            - if:
+                - condition: template
+                  value_template: "{{ notification_service != [] }}"
+              then:
+                - action: "{{ notification_service }}"
+                  data:
+                    message: "Loadbalancing: {{ current_noah.name }} <= {{ min_soc }}%, freigegeben"
+  
+  # Zusätzliche Aktionen am Ende
+  - if:
+      - condition: template
+        value_template: "{{ additional_actions != [] }}"
+    then:
+      - choose:
+          - conditions: []
+            sequence: !input additional_actions
+
+mode: single
+max_exceeded: silent
+
+# ========== CHANGELOG ==========
+# v1.0.0 (2026-03-27)
+# - Initial Release
+# - Support für 1-6 Growatt Noah 2000 Einheiten
+# - SOC-basiertes Loadbalancing mit Hysterese
+# - Optionaler Netzbezug-Override
+# - Optionaler DTU Solar-Optimizer
+# - Optionale Benachrichtigungen und Custom Actions

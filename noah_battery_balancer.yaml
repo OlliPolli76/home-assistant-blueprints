@@ -27,7 +27,7 @@ blueprint:
           filter:
             - domain: sensor
               device_class: battery
-              model: NOAH 2000
+              manufacturer: Growatt
     
     noah_1_power:
       name: Noah 1 - Output Power

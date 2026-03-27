@@ -359,64 +359,6 @@ blueprint:
 
 # ========== VARIABLES ==========
 variables:
-  # Noah-Konfiguration sammeln
-  noah_units: |
-    {%- set units = [] -%}
-    {%- if noah_1_soc != [] and noah_1_power != [] -%}
-      {%- set units = units + [{'soc': noah_1_soc, 'power': noah_1_power, 'name': 'Noah 1'}] -%}
-    {%- endif -%}
-    {%- if noah_2_soc != [] and noah_2_power != [] -%}
-      {%- set units = units + [{'soc': noah_2_soc, 'power': noah_2_power, 'name': 'Noah 2'}] -%}
-    {%- endif -%}
-    {%- if noah_3_soc != [] and noah_3_power != [] -%}
-      {%- set units = units + [{'soc': noah_3_soc, 'power': noah_3_power, 'name': 'Noah 3'}] -%}
-    {%- endif -%}
-    {%- if noah_4_soc != [] and noah_4_power != [] -%}
-      {%- set units = units + [{'soc': noah_4_soc, 'power': noah_4_power, 'name': 'Noah 4'}] -%}
-    {%- endif -%}
-    {%- if noah_5_soc != [] and noah_5_power != [] -%}
-      {%- set units = units + [{'soc': noah_5_soc, 'power': noah_5_power, 'name': 'Noah 5'}] -%}
-    {%- endif -%}
-    {%- if noah_6_soc != [] and noah_6_power != [] -%}
-      {%- set units = units + [{'soc': noah_6_soc, 'power': noah_6_power, 'name': 'Noah 6'}] -%}
-    {%- endif -%}
-    {{ units }}
-
-  # Alle SOC-Werte sammeln
-  all_soc_values: |
-    {%- set values = [] -%}
-    {%- if noah_1_soc != [] -%}
-      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_2_soc != [] -%}
-      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_3_soc != [] -%}
-      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_4_soc != [] -%}
-      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_5_soc != [] -%}
-      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_6_soc != [] -%}
-      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-    {%- endif -%}
-    {{ values }}
-
-  # Prüfen ob alle Noah 100%
-  all_at_100: |
-    {%- set values = [] -%}
-    {%- if noah_1_soc != [] -%}
-      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_2_soc != [] -%}
-      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_3_soc != [] -%}
-      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-    {%- endif -%}variables:
   # Noah-Konfiguration sammeln (als echte JSON-Liste!)
   noah_units: >
     {%- set units = [] -%}

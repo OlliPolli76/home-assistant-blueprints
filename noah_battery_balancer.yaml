@@ -223,7 +223,7 @@ blueprint:
     netzbezug_threshold:
       name: Netzbezug-Schwelle
       description: Netzbezug-Schwelle in Watt für 0verride (Standard: 2000W)
-      default: 2000
+      default: []
       selector:
         number:
           min: 0

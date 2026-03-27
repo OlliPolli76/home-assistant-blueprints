@@ -40,7 +40,7 @@ blueprint:
     noah_2_soc:
       name: Noah 2 - SOC Sensor
       description: State of Charge Sensor für Noah 2 (0-100%)
-      default: []
+      # default: []
       selector:
         entity:
           filter:
@@ -50,7 +50,7 @@ blueprint:
     noah_2_power:
       name: Noah 2 - Output Power
       description: Output Power Steuerung für Noah 2 (0-800W)
-      default: []
+      # default: []
       selector:
         entity:
           filter:

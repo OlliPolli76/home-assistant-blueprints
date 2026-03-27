@@ -358,6 +358,7 @@ blueprint:
         action: {}
 
 # ========== VARIABLES ==========
+
 variables:
   # Noah-Konfiguration sammeln (als echte JSON-Liste!)
   noah_units: >

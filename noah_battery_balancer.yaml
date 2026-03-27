@@ -381,76 +381,76 @@ variables:
       {%- set units = units + [{'soc': noah_6_soc, 'power': noah_6_power, 'name': 'Noah 6'}] -%}
     {%- endif -%}
     {{ units }}
-  
+
   # Alle SOC-Werte sammeln
   all_soc_values: |
-  {%- set values = [] -%}
-  {%- if noah_1_soc != [] -%}
-    {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_2_soc != [] -%}
-    {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_3_soc != [] -%}
-    {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_4_soc != [] -%}
-    {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_5_soc != [] -%}
-    {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_6_soc != [] -%}
-    {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-  {%- endif -%}
-  {{ values }}
-  
+    {%- set values = [] -%}
+    {%- if noah_1_soc != [] -%}
+      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_2_soc != [] -%}
+      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_3_soc != [] -%}
+      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_4_soc != [] -%}
+      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_5_soc != [] -%}
+      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_6_soc != [] -%}
+      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
+    {%- endif -%}
+    {{ values }}
+
   # Prüfen ob alle Noah 100%
   all_at_100: |
-  {%- set values = [] -%}
-  {%- if noah_1_soc != [] -%}
-    {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_2_soc != [] -%}
-    {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_3_soc != [] -%}
-    {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_4_soc != [] -%}
-    {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_5_soc != [] -%}
-    {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_6_soc != [] -%}
-    {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-  {%- endif -%}
-  {{ values | min >= 100 if values else false }}
-  
+    {%- set values = [] -%}
+    {%- if noah_1_soc != [] -%}
+      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_2_soc != [] -%}
+      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_3_soc != [] -%}
+      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_4_soc != [] -%}
+      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_5_soc != [] -%}
+      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_6_soc != [] -%}
+      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
+    {%- endif -%}
+    {{ values | min >= 100 if values else false }}
+
   # Prüfen ob mindestens einer unter 100%
   any_below_100: |
-  {%- set values = [] -%}
-  {%- if noah_1_soc != [] -%}
-    {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_2_soc != [] -%}
-    {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_3_soc != [] -%}
-    {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_4_soc != [] -%}
-    {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_5_soc != [] -%}
-    {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-  {%- endif -%}
-  {%- if noah_6_soc != [] -%}
-    {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-  {%- endif -%}
-  {{ values | min < 100 if values else false }}
-  
+    {%- set values = [] -%}
+    {%- if noah_1_soc != [] -%}
+      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_2_soc != [] -%}
+      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_3_soc != [] -%}
+      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_4_soc != [] -%}
+      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_5_soc != [] -%}
+      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_6_soc != [] -%}
+      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
+    {%- endif -%}
+    {{ values | min < 100 if values else false }}
+
   # Zeit bis Sonnenuntergang in Stunden
   hours_until_sunset: |
     {% set sunset = state_attr('sun.sun', 'next_setting') | as_datetime %}

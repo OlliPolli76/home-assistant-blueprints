@@ -287,9 +287,9 @@ blueprint:
     hours_before_sunset:
       name: Stunden vor Sonnenuntergang
       description: |
-        Ab wie vielen Stunden vor Sonnenuntergang soll DTU auf Einspeisung schalten (Standard: 2h).
+        Bis wie vielen Stunden vor Sonnenuntergang soll DTU auf Einspeisung schalten (Standard: 2h).
         
-        How many hours before sunset should DTU switch to feed-in mode (default: 2h).
+        Up to how many hours before sunset should the DTU switch to feed-in mode (default: 2 hours).
       default: 2
       selector:
         number:
@@ -452,7 +452,7 @@ action:
       - condition: template
         value_template: "{{ all_at_100 }}"
       - condition: template
-        value_template: "{{ hours_until_sunset < hours_before_sunset }}"
+        value_template: "{{ hours_until_sunset > hours_before_sunset }}"
       - condition: template
         value_template: "{{ dtu_mode_select != [] }}"
     then:

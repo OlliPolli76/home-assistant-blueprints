@@ -416,43 +416,54 @@ variables:
     {%- endif -%}
     {%- if noah_3_soc != [] -%}
       {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_4_soc != [] -%}
-      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_5_soc != [] -%}
-      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_6_soc != [] -%}
-      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-    {%- endif -%}
-    {{ values | min >= 100 if values else false }}
+    {%- endif -%}variables:
+  # Noah-Konfiguration sammeln (als echte JSON-Liste!)
+  noah_units: >
+    {%- set units = [] -%}
+    {%- set items = [
+      (noah_1_soc, noah_1_power, 'Noah 1'),
+      (noah_2_soc, noah_2_power, 'Noah 2'),
+      (noah_3_soc, noah_3_power, 'Noah 3'),
+      (noah_4_soc, noah_4_power, 'Noah 4'),
+      (noah_5_soc, noah_5_power, 'Noah 5'),
+      (noah_6_soc, noah_6_power, 'Noah 6')
+    ] -%}
+
+    {%- for soc, power, name in items %}
+      {%- if soc is defined and soc not in ['', None, []]
+            and power is defined and power not in ['', None, []] %}
+        {%- set units = units + [{'soc': soc, 'power': power, 'name': name}] %}
+      {%- endif %}
+    {%- endfor %}
+
+    {{ units | to_json }}
+
+  # Alle SOC-Werte sammeln
+  all_soc_values: >
+    {%- set values = [] -%}
+    {%- for unit in noah_units %}
+      {%- set values = values + [states(unit.soc) | float(0)] %}
+    {%- endfor %}
+    {{ values }}
+
+  # Prüfen ob alle Noah 100%
+  all_at_100: >
+    {%- if noah_units | length == 0 %}
+      false
+    {%- else %}
+      {{ (noah_units | map(attribute='soc') | map('states') | map('float', 0) | list | min) >= 100 }}
+    {%- endif %}
 
   # Prüfen ob mindestens einer unter 100%
-  any_below_100: |
-    {%- set values = [] -%}
-    {%- if noah_1_soc != [] -%}
-      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_2_soc != [] -%}
-      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_3_soc != [] -%}
-      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_4_soc != [] -%}
-      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_5_soc != [] -%}
-      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_6_soc != [] -%}
-      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-    {%- endif -%}
-    {{ values | min < 100 if values else false }}
+  any_below_100: >
+    {%- if noah_units | length == 0 %}
+      false
+    {%- else %}
+      {{ (noah_units | map(attribute='soc') | map('states') | map('float', 0) | list | min) < 100 }}
+    {%- endif %}
 
   # Zeit bis Sonnenuntergang in Stunden
-  hours_until_sunset: |
+  hours_until_sunset: >
     {% set sunset = state_attr('sun.sun', 'next_setting') | as_datetime %}
     {% set now = now() %}
     {{ (sunset - now).total_seconds() / 3600 }}

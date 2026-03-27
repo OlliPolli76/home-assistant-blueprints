@@ -247,7 +247,7 @@ blueprint:
     netzbezug_min_soc:
       name: Netzbezug Min SOC
       description: |
-        Minimaler SOC für Override (Standard: 20%)
+        Minimaler SOC für Override
       default: 20
       selector:
         number:

@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 1.8
+  name: Noah Battery Balancer 1.9
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -800,6 +800,7 @@ action:
         - variables:
             current_noah: "{{ noah_units[repeat.index - 1] }}"
             current_soc: "{{ states(current_noah.soc) | float(0) }}"
+            current_power: "{{ states(current_noah.power) | float(0) }}"
 
         # DEBUG: Loop Iteration
         - if:
@@ -813,6 +814,8 @@ action:
                   Iteration: {{ repeat.index }}
                   current_noah: {{ current_noah }}
                   current_soc: {{ current_soc }}
+                  current_power: {{ current_power }}W
+                  Is throttled: {{ current_power == min_output_power }}
                   Check >= max_soc: {{ current_soc >= max_soc }}
 
         # Wenn dieser Noah >= max_soc: Alle ANDEREN drosseln
@@ -826,9 +829,10 @@ action:
                 sequence:
                   - variables:
                       target_noah: "{{ noah_units[repeat.index - 1] }}"
+                      target_power: "{{ states(target_noah.power) | float(0) }}"
                   - if:
                       - condition: template
-                        value_template: "{{ target_noah.soc != current_noah.soc }}"
+                        value_template: "{{ target_noah.soc != current_noah.soc and target_power != min_output_power }}"
                     then:
                       - action: number.set_value
                         target:
@@ -839,10 +843,12 @@ action:
                       - variables:
                           throttled_units: "{{ throttled_units + [target_noah.name] }}"
 
-        # Wenn dieser Noah <= min_soc UND kein anderer >= max_soc: Freigeben
+        # Wenn dieser Noah <= min_soc UND aktuell gedrosselt UND kein anderer >= max_soc: Freigeben
         - if:
             - condition: template
               value_template: "{{ current_soc <= min_soc }}"
+            - condition: template
+              value_template: "{{ current_power == min_output_power }}"
             - condition: template
               value_template: |
                 {% set others_above_max = namespace(found=false) %}
@@ -864,6 +870,7 @@ action:
                     message: |
                       Releasing: {{ current_noah.name }}
                       current_soc: {{ current_soc }} <= min_soc: {{ min_soc }}
+                      current_power: {{ current_power }} == min_output_power: {{ min_output_power }}
                       Setting to max_output_power: {{ max_output_power }}
             
             # Diesen Noah freigeben
@@ -876,6 +883,25 @@ action:
             - variables:
                 released_units: "{{ released_units + [current_noah.name] }}"
 
+  # Sammle IST-Zustand aller Noah (basierend auf current_power)
+  - variables:
+      final_throttled: |
+        {%- set throttled = [] -%}
+        {%- for unit in noah_units -%}
+          {%- if states(unit.power) | float(0) == min_output_power -%}
+            {%- set throttled = throttled + [unit.name] -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {{ throttled }}
+      final_active: |
+        {%- set active = [] -%}
+        {%- for unit in noah_units -%}
+          {%- if states(unit.power) | float(0) == max_output_power -%}
+            {%- set active = active + [unit.name] -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {{ active }}
+
   # DEBUG: Final Units Status
   - if:
       - condition: template
@@ -885,10 +911,12 @@ action:
         data:
           title: "Noah Balancer Debug - Final Status"
           message: |
-            throttled_units: {{ throttled_units }}
-            released_units: {{ released_units }}
-            throttled_count: {{ throttled_units | length }}
-            released_count: {{ released_units | length }}
+            final_throttled: {{ final_throttled }}
+            final_active: {{ final_active }}
+            throttled_count: {{ final_throttled | length }}
+            active_count: {{ final_active | length }}
+            throttled_units (from loop): {{ throttled_units }}
+            released_units (from loop): {{ released_units }}
 
   # Variablen für Actions setzen (nur wenn Änderungen)
   - if:
@@ -897,8 +925,8 @@ action:
     then:
       - variables:
           action_type: "{{ 'release' if released_units | length > 0 else 'loadbalancing' }}"
-          throttled_count: "{{ throttled_units | length }}"
-          active_count: "{{ noah_units | length - throttled_units | length }}"
+          throttled_count: "{{ final_throttled | length }}"
+          active_count: "{{ final_active | length }}"
           full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
           max_soc_value: "{{ all_soc_values | max }}"
           max_soc_noah: |
@@ -910,25 +938,23 @@ action:
               {% endif %}
             {% endfor %}
           throttled_noah: |
-            {% if throttled_units | length > 0 %}
-              {{ throttled_units | join(', ') }}
+            {% if final_throttled | length > 0 %}
+              {{ final_throttled | join(', ') }}
             {% else %}
               -
             {% endif %}
           active_noah: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% if unit.name not in throttled_units %}
-                {% set ns.text = ns.text ~ unit.name ~ ', ' %}
-              {% endif %}
-            {% endfor %}
-            {{ ns.text.rstrip(', ') if ns.text else '-' }}
+            {% if final_active | length > 0 %}
+              {{ final_active | join(', ') }}
+            {% else %}
+              -
+            {% endif %}
           noah_status: |
             {% set ns = namespace(text='') %}
             {% for unit in noah_units %}
               {% set soc = states(unit.soc) | float(0) | round(0) %}
               {% set power = states(unit.power) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in throttled_units else 'Aktiv' %}
+              {% set status = 'Gedrosselt' if unit.name in final_throttled else 'Aktiv' %}
               {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (' ~ status ~ ' ' ~ power ~ 'W)\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
@@ -937,7 +963,7 @@ action:
             {% for unit in noah_units %}
               {% set soc = states(unit.soc) | float(0) | round(0) %}
               {% set power = states(unit.power) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in throttled_units else 'Aktiv' %}
+              {% set status = 'Gedrosselt' if unit.name in final_throttled else 'Aktiv' %}
               {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (' ~ status ~ ' ' ~ power ~ 'W)\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
@@ -946,7 +972,7 @@ action:
             {% for unit in noah_units %}
               {% set soc = states(unit.soc) | float(0) | round(0) %}
               {% set power = states(unit.power) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in throttled_units else 'Aktiv' %}
+              {% set status = 'Gedrosselt' if unit.name in final_throttled else 'Aktiv' %}
               {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (' ~ status ~ ' ' ~ power ~ 'W)\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
@@ -964,6 +990,15 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v1.9 (2026-03-28)
+# - KRITISCHER FIX: Zustandserkennung basierend auf IST-Power statt Loop-Tracking
+# - Problem: Blueprint "vergisst" welche Noah gedrosselt sind zwischen Runs
+# - Lösung: current_power auslesen (== min_output_power = gedrosselt, == max_output_power = aktiv)
+# - Throttle nur wenn target_power != min_output_power (nicht schon gedrosselt)
+# - Release nur wenn current_power == min_output_power (aktuell gedrosselt)
+# - Actions-Variablen (final_throttled/final_active) basieren auf IST-Zustand aller Noah
+# - Debug zeigt jetzt current_power und "Is throttled" Status
+#
 # v1.8 (2026-03-28)
 # - DEBUG: Release-Logik Debug hinzugefügt
 # - Debug zeigt jetzt: Release-Trigger, released_units, throttled_units

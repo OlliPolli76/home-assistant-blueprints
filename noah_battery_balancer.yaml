@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 1.2
+  name: Noah Battery Balancer 1.3
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -371,20 +371,35 @@ blueprint:
 # ========== VARIABLES ==========
 
 variables:
-  # Blueprint-Inputs als Variablen
+  # ========== Blueprint-Inputs als Variablen laden ==========
   debug_enabled: !input debug_enabled
-  dtu_enabled: !input dtu_enabled
+  noah_1_soc: !input noah_1_soc
+  noah_1_power: !input noah_1_power
+  noah_2_soc: !input noah_2_soc
+  noah_2_power: !input noah_2_power
+  noah_3_soc: !input noah_3_soc
+  noah_3_power: !input noah_3_power
+  noah_4_soc: !input noah_4_soc
+  noah_4_power: !input noah_4_power
+  noah_5_soc: !input noah_5_soc
+  noah_5_power: !input noah_5_power
+  noah_6_soc: !input noah_6_soc
+  noah_6_power: !input noah_6_power
+  max_soc: !input max_soc
+  min_soc: !input min_soc
+  min_output_power: !input min_output_power
+  max_output_power: !input max_output_power
   netzbezug_enabled: !input netzbezug_enabled
   netzbezug_sensor: !input netzbezug_sensor
   netzbezug_threshold: !input netzbezug_threshold
+  netzbezug_duration: !input netzbezug_duration
   netzbezug_min_soc: !input netzbezug_min_soc
+  dtu_enabled: !input dtu_enabled
   dtu_mode_select: !input dtu_mode_select
   hours_before_sunset: !input hours_before_sunset
   feed_in_output_power: !input feed_in_output_power
-  max_soc: !input max_soc
-  min_soc: !input min_soc
-  max_output_power: !input max_output_power
   actions: !input actions
+  
   # Noah-Konfiguration sammeln (als echte JSON-Liste!)
   noah_units: >
     {%- set units = [] -%}
@@ -875,6 +890,11 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v1.3 (2026-03-28)
+# - KRITISCHER FIX: Blueprint-Inputs werden jetzt ZUERST als Variablen geladen
+# - Behebt Problem: noah_units war leer, weil noah_1_soc etc. undefined waren
+# - Alle Inputs (noah_*, max_soc, min_soc, dtu_*, netzbezug_*, actions) jetzt verfügbar
+#
 # v1.1 (2026-03-28)
 # - Debug-Modus hinzugefügt (Persistent Notifications)
 # - Debug an 4 Stellen: Variables, DTU Solar, Loadbalancing Start, Loop Iterations

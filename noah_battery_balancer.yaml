@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 1.6
+  name: Noah Battery Balancer 1.7
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -228,7 +228,7 @@ blueprint:
 
     netzbezug_sensor:
       name: Netzbezug-Sensor
-      description: Sensor für aktuelle Netzleistung (positiv: Verbrauch)
+      description: Sensor für aktuelle Netzleistung (positiv - Verbrauch)
       default: []
       selector:
         entity:
@@ -288,7 +288,7 @@ blueprint:
 
     dtu_mode_select:
       name: DTU DPL Mode Select
-      description: Select-Entity für Dynamic Power Limiter Mode (0: aktiv, 1: aus, 2: deaktiviert)
+      description: Select-Entity für Dynamic Power Limiter Mode (0 - aktiv, 1 - aus, 2 - deaktiviert)
       default: []
       selector:
         entity:
@@ -937,6 +937,11 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v1.7 (2026-03-28)
+# - FIX: ':' in single-line descriptions durch '-' ersetzt
+# - Problem: YAML interpretiert "text (key: value)" als Mapping, auch mit Quotes
+# - Lösung: "positiv: Verbrauch" → "positiv - Verbrauch", "0: aktiv" → "0 - aktiv"
+#
 # v1.6 (2026-03-28)
 # - FIX: Letzte '=' Zeichen in Input-Descriptions ersetzt
 # - netzbezug_sensor: "positiv = Verbrauch" → "positiv: Verbrauch"

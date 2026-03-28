@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 1.9
+  name: Noah Battery Balancer 2.0
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -596,7 +596,7 @@ action:
               target:
                 entity_id: "{{ noah_units[repeat.index - 1].power }}"
               data:
-                value: !input feed_in_output_power
+                value: "{{ feed_in_output_power }}"
 
       # Variablen für Actions setzen
       - variables:
@@ -722,7 +722,7 @@ action:
               target:
                 entity_id: "{{ noah_units[repeat.index - 1].power }}"
               data:
-                value: !input max_output_power
+                value: "{{ max_output_power }}"
 
       # Variablen für Actions setzen
       - variables:
@@ -838,7 +838,7 @@ action:
                         target:
                           entity_id: "{{ target_noah.power }}"
                         data:
-                          value: !input min_output_power
+                          value: "{{ min_output_power }}"
                       # Zum Tracking hinzufügen
                       - variables:
                           throttled_units: "{{ throttled_units + [target_noah.name] }}"
@@ -878,7 +878,7 @@ action:
               target:
                 entity_id: "{{ current_noah.power }}"
               data:
-                value: !input max_output_power
+                value: "{{ max_output_power }}"
             # Zum Tracking hinzufügen
             - variables:
                 released_units: "{{ released_units + [current_noah.name] }}"
@@ -990,6 +990,12 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.0 (2026-03-28)
+# - KRITISCHER FIX: !input durch Template-Variablen in number.set_value Actions ersetzt
+# - Problem: !input funktioniert nicht zuverlässig in if/repeat Blöcken → Actions schlagen fehl
+# - Lösung: value: "{{ max_output_power }}" statt value: !input max_output_power
+# - Betrifft: feed_in_output_power, max_output_power, min_output_power
+#
 # v1.9 (2026-03-28)
 # - KRITISCHER FIX: Zustandserkennung basierend auf IST-Power statt Loop-Tracking
 # - Problem: Blueprint "vergisst" welche Noah gedrosselt sind zwischen Runs

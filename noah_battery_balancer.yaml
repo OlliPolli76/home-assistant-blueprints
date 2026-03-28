@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 1.4
+  name: Noah Battery Balancer 1.5
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -334,36 +334,36 @@ blueprint:
         Benachrichtigungen oder andere Aktionen nach jeder Balancing-Änderung.
         
         Verfügbare Variablen:
-        - {{action_type}} = Art der Aktion (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
-        - {{noah_status}} = Einfache Textliste aller Noah mit SOC und Status
-        - {{noah_status_html}} = HTML-formatiert (für Telegram)
-        - {{noah_status_markdown}} = Markdown-formatiert
-        - {{throttled_noah}} = Liste gedrosselter Noah (Text)
-        - {{active_noah}} = Liste aktiver Noah (Text)
-        - {{throttled_count}} = Anzahl gedrosselter Noah
-        - {{active_count}} = Anzahl aktiver Noah
-        - {{full_count}} = Anzahl Noah mit 100% SOC
-        - {{max_soc_noah}} = Name des vollsten Noah
-        - {{max_soc_value}} = Höchster SOC-Wert
-        - {{netzbezug}} = Aktueller Netzbezug (W) - nur bei netzbezug_override
-        - {{hours_to_sunset}} = Stunden bis Sonnenuntergang - nur bei dtu_solar
+        - action_type: Art der Aktion (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
+        - noah_status: Einfache Textliste aller Noah mit SOC und Status
+        - noah_status_html: HTML-formatiert (für Telegram)
+        - noah_status_markdown: Markdown-formatiert
+        - throttled_noah: Liste gedrosselter Noah (Text)
+        - active_noah: Liste aktiver Noah (Text)
+        - throttled_count: Anzahl gedrosselter Noah
+        - active_count: Anzahl aktiver Noah
+        - full_count: Anzahl Noah mit 100% SOC
+        - max_soc_noah: Name des vollsten Noah
+        - max_soc_value: Höchster SOC-Wert
+        - netzbezug: Aktueller Netzbezug (W) - nur bei netzbezug_override
+        - hours_to_sunset: Stunden bis Sonnenuntergang - nur bei dtu_solar
         
         Notifications or other actions after each balancing change.
         
         Available variables:
-        - {{action_type}} = Type of action (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
-        - {{noah_status}} = Simple text list of all Noah with SOC and status
-        - {{noah_status_html}} = HTML formatted (for Telegram)
-        - {{noah_status_markdown}} = Markdown formatted
-        - {{throttled_noah}} = List of throttled Noah (text)
-        - {{active_noah}} = List of active Noah (text)
-        - {{throttled_count}} = Count of throttled Noah
-        - {{active_count}} = Count of active Noah
-        - {{full_count}} = Count of Noah at 100% SOC
-        - {{max_soc_noah}} = Name of fullest Noah
-        - {{max_soc_value}} = Highest SOC value
-        - {{netzbezug}} = Current grid consumption (W) - only for netzbezug_override
-        - {{hours_to_sunset}} = Hours until sunset - only for dtu_solar
+        - action_type: Type of action (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
+        - noah_status: Simple text list of all Noah with SOC and status
+        - noah_status_html: HTML formatted (for Telegram)
+        - noah_status_markdown: Markdown formatted
+        - throttled_noah: List of throttled Noah (text)
+        - active_noah: List of active Noah (text)
+        - throttled_count: Count of throttled Noah
+        - active_count: Count of active Noah
+        - full_count: Count of Noah at 100% SOC
+        - max_soc_noah: Name of fullest Noah
+        - max_soc_value: Highest SOC value
+        - netzbezug: Current grid consumption (W) - only for netzbezug_override
+        - hours_to_sunset: Hours until sunset - only for dtu_solar
       default: []
       selector:
         action: {}
@@ -937,6 +937,11 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v1.5 (2026-03-28)
+# - FIX: Actions Description - '=' durch ':' ersetzt
+# - Problem: YAML parse error "character '=' is reserved"
+# - Lösung: {{variable}} = Text → variable: Text
+#
 # v1.4 (2026-03-28)
 # - KRITISCHER FIX: noah_units Template korrigiert
 # - Problem: {{ units | to_json }} gab JSON-String zurück statt Array → Iteration fehlgeschlagen

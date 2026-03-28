@@ -350,40 +350,20 @@ blueprint:
         
         Notifications or other actions after each balancing change.
         
-        description: |
-        Benachrichtigungen oder andere Aktionen nach jeder Balancing-Änderung.
-        
-        Verfügbare Variablen:
-        - {{action_type}} = Art der Aktion (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
-        - {{noah_status}} = Einfache Textliste aller Noah mit SOC und Status
-        - {{noah_status_html}} = HTML-formatiert (für Telegram)
-        - {{noah_status_markdown}} = Markdown-formatiert
-        - {{throttled_noah}} = Liste gedrosselter Noah (Text)
-        - {{active_noah}} = Liste aktiver Noah (Text)
-        - {{throttled_count}} = Anzahl gedrosselter Noah
-        - {{active_count}} = Anzahl aktiver Noah
-        - {{full_count}} = Anzahl Noah mit 100% SOC
-        - {{max_soc_noah}} = Name des vollsten Noah
-        - {{max_soc_value}} = Höchster SOC-Wert
-        - {{netzbezug}} = Aktueller Netzbezug (W) - nur bei netzbezug_override
-        - {{hours_to_sunset}} = Stunden bis Sonnenuntergang - nur bei dtu_solar
-        
-        Notifications or other actions after each balancing change.
-        
         Available variables:
-        - {{action_type}} = Type of action (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
-        - {{noah_status}} = Simple text list of all Noah with SOC and status
-        - {{noah_status_html}} = HTML formatted (for Telegram)
-        - {{noah_status_markdown}} = Markdown formatted
-        - {{throttled_noah}} = List of throttled Noah (text)
-        - {{active_noah}} = List of active Noah (text)
-        - {{throttled_count}} = Count of throttled Noah
-        - {{active_count}} = Count of active Noah
-        - {{full_count}} = Count of Noah at 100% SOC
-        - {{max_soc_noah}} = Name of fullest Noah
-        - {{max_soc_value}} = Highest SOC value
-        - {{netzbezug}} = Current grid consumption (W) - only for netzbezug_override
-        - {{hours_to_sunset}} = Hours until sunset - only for dtu_solar
+        - action_type: Type of action (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
+        - noah_status: Simple text list of all Noah with SOC and status
+        - noah_status_html: HTML formatted (for Telegram)
+        - noah_status_markdown: Markdown formatted
+        - throttled_noah: List of throttled Noah (text)
+        - active_noah: List of active Noah (text)
+        - throttled_count: Count of throttled Noah
+        - active_count: Count of active Noah
+        - full_count: Count of Noah at 100% SOC
+        - max_soc_noah: Name of fullest Noah
+        - max_soc_value: Highest SOC value
+        - netzbezug: Current grid consumption (W) - only for netzbezug_override
+        - hours_to_sunset: Hours until sunset - only for dtu_solar
       default: []
       selector:
         action: {}
@@ -873,6 +853,19 @@ action:
                 {% endfor %}
                 {{ not others_above_max.found }}
           then:
+            # DEBUG: Release
+            - if:
+                - condition: template
+                  value_template: "{{ debug_enabled }}"
+              then:
+                - service: persistent_notification.create
+                  data:
+                    title: "Noah Balancer Debug - Release {{ repeat.index }}"
+                    message: |
+                      Releasing: {{ current_noah.name }}
+                      current_soc: {{ current_soc }} <= min_soc: {{ min_soc }}
+                      Setting to max_output_power: {{ max_output_power }}
+            
             # Diesen Noah freigeben
             - action: number.set_value
               target:
@@ -882,6 +875,20 @@ action:
             # Zum Tracking hinzufügen
             - variables:
                 released_units: "{{ released_units + [current_noah.name] }}"
+
+  # DEBUG: Final Units Status
+  - if:
+      - condition: template
+        value_template: "{{ debug_enabled }}"
+    then:
+      - service: persistent_notification.create
+        data:
+          title: "Noah Balancer Debug - Final Status"
+          message: |
+            throttled_units: {{ throttled_units }}
+            released_units: {{ released_units }}
+            throttled_count: {{ throttled_units | length }}
+            released_count: {{ released_units | length }}
 
   # Variablen für Actions setzen (nur wenn Änderungen)
   - if:
@@ -957,6 +964,11 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v1.8 (2026-03-28)
+# - DEBUG: Release-Logik Debug hinzugefügt
+# - Debug zeigt jetzt: Release-Trigger, released_units, throttled_units
+# - Hilft zu debuggen warum Noah unter min_soc gedrosselt bleiben
+#
 # v1.7 (2026-03-28)
 # - FIX: ':' in single-line descriptions durch '-' ersetzt
 # - Problem: YAML interpretiert "text (key: value)" als Mapping, auch mit Quotes

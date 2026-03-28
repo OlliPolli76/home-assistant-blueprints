@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer
+  name: Noah Battery Balancer 1.2
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.

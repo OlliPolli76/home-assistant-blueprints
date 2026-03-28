@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 1.1
+  name: Noah Battery Balancer 1.2
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -371,6 +371,20 @@ blueprint:
 # ========== VARIABLES ==========
 
 variables:
+  # Blueprint-Inputs als Variablen
+  debug_enabled: !input debug_enabled
+  dtu_enabled: !input dtu_enabled
+  netzbezug_enabled: !input netzbezug_enabled
+  netzbezug_sensor: !input netzbezug_sensor
+  netzbezug_threshold: !input netzbezug_threshold
+  netzbezug_min_soc: !input netzbezug_min_soc
+  dtu_mode_select: !input dtu_mode_select
+  hours_before_sunset: !input hours_before_sunset
+  feed_in_output_power: !input feed_in_output_power
+  max_soc: !input max_soc
+  min_soc: !input min_soc
+  max_output_power: !input max_output_power
+  actions: !input actions
   # Noah-Konfiguration sammeln (als echte JSON-Liste!)
   noah_units: >
     {%- set units = [] -%}

@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 1.3
+  name: Noah Battery Balancer 1.4
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -400,50 +400,97 @@ variables:
   feed_in_output_power: !input feed_in_output_power
   actions: !input actions
   
-  # Noah-Konfiguration sammeln (als echte JSON-Liste!)
-  noah_units: >
+  # Noah-Konfiguration sammeln
+  noah_units: |
     {%- set units = [] -%}
-    {%- set items = [
-      (noah_1_soc, noah_1_power, 'Noah 1'),
-      (noah_2_soc, noah_2_power, 'Noah 2'),
-      (noah_3_soc, noah_3_power, 'Noah 3'),
-      (noah_4_soc, noah_4_power, 'Noah 4'),
-      (noah_5_soc, noah_5_power, 'Noah 5'),
-      (noah_6_soc, noah_6_power, 'Noah 6')
-    ] -%}
-
-    {%- for soc, power, name in items %}
-      {%- if soc is defined and soc not in ['', None, []]
-            and power is defined and power not in ['', None, []] %}
-        {%- set units = units + [{'soc': soc, 'power': power, 'name': name}] %}
-      {%- endif %}
-    {%- endfor %}
-
-    {{ units | to_json }}
+    {%- if noah_1_soc not in ['', None, []] and noah_1_power not in ['', None, []] -%}
+      {%- set units = units + [{'soc': noah_1_soc, 'power': noah_1_power, 'name': 'Noah 1'}] -%}
+    {%- endif -%}
+    {%- if noah_2_soc not in ['', None, []] and noah_2_power not in ['', None, []] -%}
+      {%- set units = units + [{'soc': noah_2_soc, 'power': noah_2_power, 'name': 'Noah 2'}] -%}
+    {%- endif -%}
+    {%- if noah_3_soc not in ['', None, []] and noah_3_power not in ['', None, []] -%}
+      {%- set units = units + [{'soc': noah_3_soc, 'power': noah_3_power, 'name': 'Noah 3'}] -%}
+    {%- endif -%}
+    {%- if noah_4_soc not in ['', None, []] and noah_4_power not in ['', None, []] -%}
+      {%- set units = units + [{'soc': noah_4_soc, 'power': noah_4_power, 'name': 'Noah 4'}] -%}
+    {%- endif -%}
+    {%- if noah_5_soc not in ['', None, []] and noah_5_power not in ['', None, []] -%}
+      {%- set units = units + [{'soc': noah_5_soc, 'power': noah_5_power, 'name': 'Noah 5'}] -%}
+    {%- endif -%}
+    {%- if noah_6_soc not in ['', None, []] and noah_6_power not in ['', None, []] -%}
+      {%- set units = units + [{'soc': noah_6_soc, 'power': noah_6_power, 'name': 'Noah 6'}] -%}
+    {%- endif -%}
+    {{ units }}
 
   # Alle SOC-Werte sammeln
-  all_soc_values: >
+  all_soc_values: |
     {%- set values = [] -%}
-    {%- for unit in noah_units %}
-      {%- set values = values + [states(unit.soc) | float(0)] %}
-    {%- endfor %}
+    {%- if noah_1_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_2_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_3_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_4_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_5_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_6_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
+    {%- endif -%}
     {{ values }}
 
   # Prüfen ob alle Noah 100%
-  all_at_100: >
-    {%- if noah_units | length == 0 %}
-      false
-    {%- else %}
-      {{ (noah_units | map(attribute='soc') | map('states') | map('float', 0) | list | min) >= 100 }}
-    {%- endif %}
+  all_at_100: |
+    {%- set values = [] -%}
+    {%- if noah_1_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_2_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_3_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_4_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_5_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_6_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
+    {%- endif -%}
+    {{ values | min >= 100 if values else false }}
 
   # Prüfen ob mindestens einer unter 100%
-  any_below_100: >
-    {%- if noah_units | length == 0 %}
-      false
-    {%- else %}
-      {{ (noah_units | map(attribute='soc') | map('states') | map('float', 0) | list | min) < 100 }}
-    {%- endif %}
+  any_below_100: |
+    {%- set values = [] -%}
+    {%- if noah_1_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_2_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_3_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_4_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_5_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
+    {%- endif -%}
+    {%- if noah_6_soc not in ['', None, []] -%}
+      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
+    {%- endif -%}
+    {{ values | min < 100 if values else false }}
 
   # Zeit bis Sonnenuntergang in Stunden
   hours_until_sunset: >
@@ -890,6 +937,12 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v1.4 (2026-03-28)
+# - KRITISCHER FIX: noah_units Template korrigiert
+# - Problem: {{ units | to_json }} gab JSON-String zurück statt Array → Iteration fehlgeschlagen
+# - Lösung: Direktes {{ units }} ohne to_json
+# - all_soc_values, all_at_100, any_below_100 direkt auf Entity-IDs statt noah_units
+#
 # v1.3 (2026-03-28)
 # - KRITISCHER FIX: Blueprint-Inputs werden jetzt ZUERST als Variablen geladen
 # - Behebt Problem: noah_units war leer, weil noah_1_soc etc. undefined waren

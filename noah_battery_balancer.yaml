@@ -45,7 +45,6 @@ blueprint:
         entity:
           filter:
             - domain: number
-              device_class: power
 
     noah_2_soc:
       name: Noah 2 - SOC Sensor
@@ -65,7 +64,6 @@ blueprint:
         entity:
           filter:
             - domain: number
-              device_class: power
 
     noah_3_soc:
       name: Noah 3 - SOC Sensor
@@ -85,7 +83,6 @@ blueprint:
         entity:
           filter:
             - domain: number
-              device_class: power
 
     noah_4_soc:
       name: Noah 4 - SOC Sensor
@@ -105,7 +102,6 @@ blueprint:
         entity:
           filter:
             - domain: number
-              device_class: power
 
     noah_5_soc:
       name: Noah 5 - SOC Sensor
@@ -125,7 +121,6 @@ blueprint:
         entity:
           filter:
             - domain: number
-              device_class: power
 
     noah_6_soc:
       name: Noah 6 - SOC Sensor
@@ -145,7 +140,6 @@ blueprint:
         entity:
           filter:
             - domain: number
-              device_class: power
 
     # ========== SOC Thresholds ==========
     max_soc:

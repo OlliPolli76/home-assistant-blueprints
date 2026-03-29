@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.1
+  name: Noah Battery Balancer 2.2
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -21,9 +21,9 @@ blueprint:
     debug_enabled:
       name: Debug-Modus
       description: |
-        Aktiviert Debug-Logging über Persistent Notifications.
+        Aktiviert Debug-Logging über Logbook-Einträge.
         
-        Enables debug logging via Persistent Notifications.
+        Enables debug logging via Logbook entries.
       default: false
       selector:
         boolean:
@@ -542,14 +542,10 @@ action:
       - condition: template
         value_template: "{{ debug_enabled }}"
     then:
-      - service: persistent_notification.create
+      - service: logbook.log
         data:
-          title: "Noah Balancer Debug - Variables"
-          message: |
-            noah_units: {{ noah_units }}
-            all_soc_values: {{ all_soc_values }}
-            all_at_100: {{ all_at_100 }}
-            hours_until_sunset: {{ hours_until_sunset }}
+          name: Noah Balancer Debug
+          message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
 
   # ========== PRIO 1: DTU Solar-Optimizer ==========
   - if:
@@ -567,13 +563,10 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: persistent_notification.create
+          - service: logbook.log
             data:
-              title: "Noah Balancer Debug - DTU Solar"
-              message: |
-                all_at_100: {{ all_at_100 }}
-                hours_until_sunset: {{ hours_until_sunset }}
-                hours_before_sunset: {{ hours_before_sunset }}
+              name: Noah Balancer DTU
+              message: "Solar Override - All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h (threshold: {{ hours_before_sunset }}h), Mode→2, Power→{{ feed_in_output_power }}W"
 
       # DTU Mode auf 2 (deaktiviert = Einspeisung)
       - action: select.select_option
@@ -773,14 +766,10 @@ action:
       - condition: template
         value_template: "{{ debug_enabled }}"
     then:
-      - service: persistent_notification.create
+      - service: logbook.log
         data:
-          title: "Noah Balancer Debug - Loadbalancing"
-          message: |
-            noah_units: {{ noah_units }}
-            noah_units length: {{ noah_units | length }}
-            max_soc: {{ max_soc }}
-            min_soc: {{ min_soc }}
+          name: Noah Balancer Loadbalancing
+          message: "Start - Units: {{ noah_units | length }}, Thresholds: max {{ max_soc }}% / min {{ min_soc }}%"
 
   # Variablen für Tracking vorbereiten
   - variables:
@@ -801,16 +790,10 @@ action:
             - condition: template
               value_template: "{{ debug_enabled }}"
           then:
-            - service: persistent_notification.create
+            - service: logbook.log
               data:
-                title: "Noah Balancer Debug - Loop {{ repeat.index }}"
-                message: |
-                  Iteration: {{ repeat.index }}
-                  current_noah: {{ current_noah }}
-                  current_soc: {{ current_soc }}
-                  current_power: {{ current_power }}W
-                  Is throttled: {{ current_power == min_output_power }}
-                  Check >= max_soc: {{ current_soc >= max_soc }}
+                name: Noah Balancer Loop
+                message: "#{{ repeat.index }} {{ current_noah.name }} - SOC: {{ current_soc }}%, Power: {{ current_power }}W, Throttled: {{ current_power == min_output_power }}, Check≥{{ max_soc }}: {{ current_soc >= max_soc }}"
 
         # Wenn dieser Noah >= max_soc: Alle ANDEREN drosseln
         - if:
@@ -858,14 +841,10 @@ action:
                 - condition: template
                   value_template: "{{ debug_enabled }}"
               then:
-                - service: persistent_notification.create
+                - service: logbook.log
                   data:
-                    title: "Noah Balancer Debug - Release {{ repeat.index }}"
-                    message: |
-                      Releasing: {{ current_noah.name }}
-                      current_soc: {{ current_soc }} <= min_soc: {{ min_soc }}
-                      current_power: {{ current_power }} == min_output_power: {{ min_output_power }}
-                      Setting to max_output_power: {{ max_output_power }}
+                    name: Noah Balancer Release
+                    message: "{{ current_noah.name }} released - SOC: {{ current_soc }}% ≤ {{ min_soc }}%, Power: {{ current_power }}W → {{ max_output_power }}W"
             
             # Diesen Noah freigeben
             - action: number.set_value
@@ -901,16 +880,10 @@ action:
       - condition: template
         value_template: "{{ debug_enabled }}"
     then:
-      - service: persistent_notification.create
+      - service: logbook.log
         data:
-          title: "Noah Balancer Debug - Final Status"
-          message: |
-            final_throttled: {{ final_throttled }}
-            final_active: {{ final_active }}
-            throttled_count: {{ final_throttled | length }}
-            active_count: {{ final_active | length }}
-            throttled_units (from loop): {{ throttled_units }}
-            released_units (from loop): {{ released_units }}
+          name: Noah Balancer Status
+          message: "Final - Throttled: {{ final_throttled | join(', ') or 'none' }} ({{ final_throttled | length }}), Active: {{ final_active | join(', ') or 'none' }} ({{ final_active | length }}), Loop: T={{ throttled_units | length }} R={{ released_units | length }}"
 
   # Variablen für Actions setzen (nur wenn Änderungen)
   - if:
@@ -984,6 +957,12 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.2 (2026-03-29)
+# - Debug-System auf logbook.log umgestellt (6 Stellen)
+# - persistent_notification.create → logbook.log für saubere Logs
+# - Logbook-Einträge dauerhaft nachvollziehbar in HA History
+# - Keine UI-Spam mehr durch Debug-Modus
+#
 # v2.0 (2026-03-28)
 # - KRITISCHER FIX: !input durch Template-Variablen in number.set_value Actions ersetzt
 # - Problem: !input funktioniert nicht zuverlässig in if/repeat Blöcken → Actions schlagen fehl

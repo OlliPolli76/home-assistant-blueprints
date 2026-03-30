@@ -188,7 +188,7 @@ blueprint:
         number:
           min: 0
           max: 800
-          step: 10
+          step: 50
           unit_of_measurement: "W"
           mode: box
 
@@ -203,7 +203,7 @@ blueprint:
         number:
           min: 0
           max: 800
-          step: 10
+          step: 50
           unit_of_measurement: "W"
           mode: box
 

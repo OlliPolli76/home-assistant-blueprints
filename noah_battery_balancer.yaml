@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.3
+  name: Noah Battery Balancer 2.4
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -892,7 +892,7 @@ action:
   # Variablen für Actions setzen (nur wenn Änderungen)
   - if:
       - condition: template
-        value_template: "{{ final_throttled | length > 0 }}"
+        value_template: "{{ throttled_units | length > 0 or released_units | length > 0 }}"
     then:
       - variables:
           changes_made: true
@@ -964,6 +964,12 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.4 (2026-03-30)
+# - KRITISCHER FIX: Telegram-Nachrichten funktionieren jetzt
+# - Condition auf throttled_units/released_units statt final_throttled
+# - Problem: Noah brauchen 1-2s für Wertübernahme → final_throttled war beim Check leer
+# - Lösung: Prüfe ob number.set_value AUFGERUFEN wurde, nicht IST-Zustand
+#
 # v2.3 (2026-03-30)
 # - KRITISCHER FIX: Actions werden nur bei echten Änderungen ausgeführt
 # - changes_made Flag eingeführt (DTU/Netzbezug/Loadbalancing)

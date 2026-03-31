@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.5
+  name: Noah Battery Balancer 2.6
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -838,6 +838,16 @@ action:
   - if:
       - condition: template
         value_template: "{{ all_soc_values | max < min_soc }}"
+      # NEU: Nur wenn mindestens 1 Noah NICHT auf max_output_power
+      - condition: template
+        value_template: >
+          {% set any_not_max = namespace(found=false) %}
+          {% for unit in noah_units %}
+            {% if states(unit.power) | float(0) < max_output_power %}
+              {% set any_not_max.found = true %}
+            {% endif %}
+          {% endfor %}
+          {{ any_not_max.found }}
     then:
       # DEBUG: Globale Release
       - if:
@@ -1118,6 +1128,12 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.6 (2026-03-31)
+# - KRITISCHER FIX: Globale Release triggert nicht mehr bei jeder SOC-Änderung
+# - Condition erweitert: Nur wenn min. 1 Noah < max_output_power
+# - Problem: Release-Spam obwohl alle Noah bereits auf max
+# - Lösung: Prüfe ob überhaupt was zu tun ist
+#
 # v2.5 (2026-03-31)
 # - GLOBALE RELEASE-LOGIK: Wenn ALLE Noah < min_soc → Alle auf max_output_power
 # - NETZBEZUG-OVERRIDE VERBESSERUNGEN:

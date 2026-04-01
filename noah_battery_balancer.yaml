@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.6
+  name: Noah Battery Balancer 2.7
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -762,9 +762,9 @@ action:
           {% set power_entities = noah_units | map(attribute='power') | list %}
           {% set last_changes = [] %}
           {% for entity in power_entities %}
-            {% set last_change = as_timestamp(state_attr(entity, 'last_changed')) %}
-            {% if last_change is not none %}
-              {% set last_changes = last_changes + [last_change] %}
+            {% set last_change_attr = state_attr(entity, 'last_changed') %}
+            {% if last_change_attr is not none %}
+              {% set last_changes = last_changes + [as_timestamp(last_change_attr)] %}
             {% endif %}
           {% endfor %}
           {% if last_changes | length > 0 %}
@@ -939,12 +939,44 @@ action:
           name: Noah Balancer Loadbalancing
           message: "Start - Units: {{ noah_units | length }}, Thresholds: max {{ max_soc }}% / min {{ min_soc }}%"
 
-  # Variablen für Tracking vorbereiten
+  # PHASE 1: Entscheide basierend auf SOC (NICHT Power) wer gedrosselt/released werden sollte
   - variables:
+      # Welche Noah SOLLTEN gedrosselt sein? (wenn anderer >= max_soc)
+      should_be_throttled: |
+        {%- set result = [] -%}
+        {%- for unit in noah_units -%}
+          {%- for other in noah_units -%}
+            {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
+              {%- set result = result + [unit.name] -%}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endfor -%}
+        {{ result | unique | list }}
+      
+      # Welche Noah SOLLTEN released sein? (wenn <= min_soc UND kein anderer >= max_soc)
+      should_be_released: |
+        {%- set result = [] -%}
+        {%- for unit in noah_units -%}
+          {%- set current_soc = states(unit.soc) | float(0) -%}
+          {%- if current_soc <= min_soc -%}
+            {%- set others_above_max = namespace(found=false) -%}
+            {%- for other in noah_units -%}
+              {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
+                {%- set others_above_max.found = true -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if not others_above_max.found -%}
+              {%- set result = result + [unit.name] -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {{ result | unique | list }}
+      
+      # Variablen für tatsächlich durchgeführte Actions
       throttled_units: []
       released_units: []
 
-  # Für jeden Noah prüfen ob er über max_soc liegt
+  # PHASE 2: Für jeden Noah - Setze nur wenn Power != Ziel
   - repeat:
       count: "{{ noah_units | length }}"
       sequence:
@@ -961,48 +993,30 @@ action:
             - service: logbook.log
               data:
                 name: Noah Balancer Loop
-                message: "#{{ repeat.index }} {{ current_noah.name }} - SOC: {{ current_soc }}%, Power: {{ current_power }}W, Throttled: {{ current_power == min_output_power }}, Check≥{{ max_soc }}: {{ current_soc >= max_soc }}"
+                message: "#{{ repeat.index }} {{ current_noah.name }} - SOC: {{ current_soc }}%, Power: {{ current_power }}W, Should throttle: {{ current_noah.name in should_be_throttled }}, Should release: {{ current_noah.name in should_be_released }}"
 
-        # Wenn dieser Noah >= max_soc: Alle ANDEREN drosseln
+        # DROSSELN wenn dieser Noah in should_be_throttled UND Power != min
         - if:
             - condition: template
-              value_template: "{{ current_soc >= max_soc }}"
+              value_template: "{{ current_noah.name in should_be_throttled }}"
+            - condition: template
+              value_template: "{{ current_power != min_output_power }}"
           then:
-            # Alle anderen Noah drosseln und tracken
-            - repeat:
-                count: "{{ noah_units | length }}"
-                sequence:
-                  - variables:
-                      target_noah: "{{ noah_units[repeat.index - 1] }}"
-                      target_power: "{{ states(target_noah.power) | float(0) }}"
-                  - if:
-                      - condition: template
-                        value_template: "{{ target_noah.soc != current_noah.soc and target_power != min_output_power }}"
-                    then:
-                      - action: number.set_value
-                        target:
-                          entity_id: "{{ target_noah.power }}"
-                        data:
-                          value: "{{ min_output_power }}"
-                      # Zum Tracking hinzufügen
-                      - variables:
-                          throttled_units: "{{ throttled_units + [target_noah.name] }}"
+            - action: number.set_value
+              target:
+                entity_id: "{{ current_noah.power }}"
+              data:
+                value: "{{ min_output_power }}"
+            - variables:
+                throttled_units: "{{ throttled_units + [current_noah.name] }}"
+                changes_made: true
 
-        # Wenn dieser Noah <= min_soc UND aktuell gedrosselt UND kein anderer >= max_soc: Freigeben
+        # RELEASE wenn dieser Noah in should_be_released UND Power != max
         - if:
             - condition: template
-              value_template: "{{ current_soc <= min_soc }}"
+              value_template: "{{ current_noah.name in should_be_released }}"
             - condition: template
-              value_template: "{{ current_power == min_output_power }}"
-            - condition: template
-              value_template: |
-                {% set others_above_max = namespace(found=false) %}
-                {% for unit in noah_units %}
-                  {% if unit.soc != current_noah.soc and states(unit.soc) | float(0) >= max_soc %}
-                    {% set others_above_max.found = true %}
-                  {% endif %}
-                {% endfor %}
-                {{ not others_above_max.found }}
+              value_template: "{{ current_power != max_output_power }}"
           then:
             # DEBUG: Release
             - if:
@@ -1014,34 +1028,26 @@ action:
                     name: Noah Balancer Release
                     message: "{{ current_noah.name }} released - SOC: {{ current_soc }}% ≤ {{ min_soc }}%, Power: {{ current_power }}W → {{ max_output_power }}W"
             
-            # Diesen Noah freigeben
             - action: number.set_value
               target:
                 entity_id: "{{ current_noah.power }}"
               data:
                 value: "{{ max_output_power }}"
-            # Zum Tracking hinzufügen
             - variables:
                 released_units: "{{ released_units + [current_noah.name] }}"
+                changes_made: true
 
-  # Sammle IST-Zustand aller Noah (basierend auf current_power)
+  # PHASE 3: Actions Variablen (basiert auf should-Listen, nicht veraltetem states())
   - variables:
-      final_throttled: |
-        {%- set throttled = [] -%}
+      # Wer sollte aktiv sein? = Alle außer should_be_throttled
+      should_be_active: |
+        {%- set result = [] -%}
         {%- for unit in noah_units -%}
-          {%- if states(unit.power) | float(0) == min_output_power -%}
-            {%- set throttled = throttled + [unit.name] -%}
+          {%- if unit.name not in should_be_throttled -%}
+            {%- set result = result + [unit.name] -%}
           {%- endif -%}
         {%- endfor -%}
-        {{ throttled }}
-      final_active: |
-        {%- set active = [] -%}
-        {%- for unit in noah_units -%}
-          {%- if states(unit.power) | float(0) == max_output_power -%}
-            {%- set active = active + [unit.name] -%}
-          {%- endif -%}
-        {%- endfor -%}
-        {{ active }}
+        {{ result }}
 
   # DEBUG: Final Units Status
   - if:
@@ -1051,7 +1057,7 @@ action:
       - service: logbook.log
         data:
           name: Noah Balancer Status
-          message: "Final - Throttled: {{ final_throttled | join(', ') or 'none' }} ({{ final_throttled | length }}), Active: {{ final_active | join(', ') or 'none' }} ({{ final_active | length }}), Loop: T={{ throttled_units | length }} R={{ released_units | length }}"
+          message: "Should throttle: {{ should_be_throttled | join(', ') or 'none' }} ({{ should_be_throttled | length }}), Should active: {{ should_be_active | join(', ') or 'none' }} ({{ should_be_active | length }}), Loop actions: T={{ throttled_units | length }} R={{ released_units | length }}"
 
   # Variablen für Actions setzen (nur wenn Änderungen)
   - if:
@@ -1061,8 +1067,8 @@ action:
       - variables:
           changes_made: true
           action_type: "{{ 'release' if released_units | length > 0 else 'loadbalancing' }}"
-          throttled_count: "{{ final_throttled | length }}"
-          active_count: "{{ final_active | length }}"
+          throttled_count: "{{ should_be_throttled | length }}"
+          active_count: "{{ should_be_active | length }}"
           full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
           max_soc_value: "{{ all_soc_values | max }}"
           max_soc_noah: |
@@ -1074,14 +1080,14 @@ action:
               {% endif %}
             {% endfor %}
           throttled_noah: |
-            {% if final_throttled | length > 0 %}
-              {{ final_throttled | join(', ') }}
+            {% if should_be_throttled | length > 0 %}
+              {{ should_be_throttled | join(', ') }}
             {% else %}
               -
             {% endif %}
           active_noah: |
-            {% if final_active | length > 0 %}
-              {{ final_active | join(', ') }}
+            {% if should_be_active | length > 0 %}
+              {{ should_be_active | join(', ') }}
             {% else %}
               -
             {% endif %}
@@ -1089,27 +1095,27 @@ action:
             {% set ns = namespace(text='') %}
             {% for unit in noah_units %}
               {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set power = states(unit.power) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in final_throttled else 'Aktiv' %}
-              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (' ~ status ~ ' ' ~ power ~ 'W)\n' %}
+              {% set status = 'Gedrosselt' if unit.name in should_be_throttled else 'Aktiv' %}
+              {% set target_power = min_output_power if unit.name in should_be_throttled else max_output_power %}
+              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (' ~ status ~ ' → ' ~ target_power ~ 'W)\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
           noah_status_html: |
             {% set ns = namespace(text='') %}
             {% for unit in noah_units %}
               {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set power = states(unit.power) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in final_throttled else 'Aktiv' %}
-              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (' ~ status ~ ' ' ~ power ~ 'W)\n' %}
+              {% set status = 'Gedrosselt' if unit.name in should_be_throttled else 'Aktiv' %}
+              {% set target_power = min_output_power if unit.name in should_be_throttled else max_output_power %}
+              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (' ~ status ~ ' → ' ~ target_power ~ 'W)\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
           noah_status_markdown: |
             {% set ns = namespace(text='') %}
             {% for unit in noah_units %}
               {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set power = states(unit.power) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in final_throttled else 'Aktiv' %}
-              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (' ~ status ~ ' ' ~ power ~ 'W)\n' %}
+              {% set status = 'Gedrosselt' if unit.name in should_be_throttled else 'Aktiv' %}
+              {% set target_power = min_output_power if unit.name in should_be_throttled else max_output_power %}
+              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (' ~ status ~ ' → ' ~ target_power ~ 'W)\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
 
@@ -1128,6 +1134,15 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.7 (2026-04-01)
+# - KRITISCHER FIX: 2-Phasen-Tracking-System für Noah Power
+# - Problem: Noah Power Entities brauchen 2-3s bis sie aktualisiert werden
+# - Phase 1: Entscheide VOR set_value basierend auf SOC (nicht Power)
+# - Phase 2: Setze nur wenn Power != Ziel (mit veraltetem Check)
+# - Phase 3: Actions nutzen SOC-basierte Listen (nicht veraltete states)
+# - Cooldown Template Fix: as_timestamp erst NACH None-Check
+# - Lösung: Keine delays, schnelle Entscheidungen, korrekte Actions
+#
 # v2.6 (2026-03-31)
 # - KRITISCHER FIX: Globale Release triggert nicht mehr bei jeder SOC-Änderung
 # - Condition erweitert: Nur wenn min. 1 Noah < max_output_power

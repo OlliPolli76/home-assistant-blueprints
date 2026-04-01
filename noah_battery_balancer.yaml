@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.7
+  name: Noah Battery Balancer 2.8
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -943,19 +943,19 @@ action:
   - variables:
       # Welche Noah SOLLTEN gedrosselt sein? (wenn anderer >= max_soc)
       should_be_throttled: |
-        {%- set result = [] -%}
+        {%- set result = namespace(list=[]) -%}
         {%- for unit in noah_units -%}
           {%- for other in noah_units -%}
             {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
-              {%- set result = result + [unit.name] -%}
+              {%- set result.list = result.list + [unit.name] -%}
             {%- endif -%}
           {%- endfor -%}
         {%- endfor -%}
-        {{ result | unique | list }}
+        {{ result.list | unique | list }}
       
       # Welche Noah SOLLTEN released sein? (wenn <= min_soc UND kein anderer >= max_soc)
       should_be_released: |
-        {%- set result = [] -%}
+        {%- set result = namespace(list=[]) -%}
         {%- for unit in noah_units -%}
           {%- set current_soc = states(unit.soc) | float(0) -%}
           {%- if current_soc <= min_soc -%}
@@ -966,11 +966,11 @@ action:
               {%- endif -%}
             {%- endfor -%}
             {%- if not others_above_max.found -%}
-              {%- set result = result + [unit.name] -%}
+              {%- set result.list = result.list + [unit.name] -%}
             {%- endif -%}
           {%- endif -%}
         {%- endfor -%}
-        {{ result | unique | list }}
+        {{ result.list | unique | list }}
       
       # Variablen für tatsächlich durchgeführte Actions
       throttled_units: []
@@ -1041,13 +1041,13 @@ action:
   - variables:
       # Wer sollte aktiv sein? = Alle außer should_be_throttled
       should_be_active: |
-        {%- set result = [] -%}
+        {%- set result = namespace(list=[]) -%}
         {%- for unit in noah_units -%}
           {%- if unit.name not in should_be_throttled -%}
-            {%- set result = result + [unit.name] -%}
+            {%- set result.list = result.list + [unit.name] -%}
           {%- endif -%}
         {%- endfor -%}
-        {{ result }}
+        {{ result.list }}
 
   # DEBUG: Final Units Status
   - if:
@@ -1134,6 +1134,12 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.8 (2026-04-01)
+# - KRITISCHER FIX: Jinja2 namespace für Liste-Konstruktion
+# - Problem: result = result + [item] funktioniert nicht korrekt in Jinja2 loops
+# - Lösung: namespace(list=[]) verwenden für mutable Listen
+# - Betrifft: should_be_throttled, should_be_released, should_be_active
+#
 # v2.7 (2026-04-01)
 # - KRITISCHER FIX: 2-Phasen-Tracking-System für Noah Power
 # - Problem: Noah Power Entities brauchen 2-3s bis sie aktualisiert werden

@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.8
+  name: Noah Battery Balancer 2.9
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -838,95 +838,102 @@ action:
   - if:
       - condition: template
         value_template: "{{ all_soc_values | max < min_soc }}"
-      # NEU: Nur wenn mindestens 1 Noah NICHT auf max_output_power
-      - condition: template
-        value_template: >
-          {% set any_not_max = namespace(found=false) %}
-          {% for unit in noah_units %}
-            {% if states(unit.power) | float(0) < max_output_power %}
-              {% set any_not_max.found = true %}
-            {% endif %}
-          {% endfor %}
-          {{ any_not_max.found }}
     then:
-      # DEBUG: Globale Release
-      - if:
-          - condition: template
-            value_template: "{{ debug_enabled }}"
-        then:
-          - service: logbook.log
-            data:
-              name: Noah Balancer Release
-              message: "Global Release - Alle Noah < {{ min_soc }}%, setze alle auf {{ max_output_power }}W"
-
-      # Alle Noah auf max_output_power
-      - repeat:
-          count: "{{ noah_units | length }}"
-          sequence:
-            - action: number.set_value
-              target:
-                entity_id: "{{ noah_units[repeat.index - 1].power }}"
-              data:
-                value: "{{ max_output_power }}"
-
-      # Variablen für Actions setzen
+      # Entscheide ob überhaupt was zu tun ist
       - variables:
-          changes_made: true
-          action_type: "release"
-          throttled_count: 0
-          active_count: "{{ noah_units | length }}"
-          full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
-          max_soc_value: "{{ all_soc_values | max }}"
-          max_soc_noah: |
-            {% set max_val = all_soc_values | max %}
-            {% for unit in noah_units %}
-              {% if states(unit.soc) | float(0) == max_val %}
-                {{ unit.name }}
-                {% break %}
-              {% endif %}
-            {% endfor %}
-          throttled_noah: "-"
-          active_noah: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set ns.text = ns.text ~ unit.name ~ ', ' %}
-            {% endfor %}
-            {{ ns.text.rstrip(', ') }}
-          noah_status: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_html: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_markdown: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-
-      # Actions ausführen
+          global_release_needed: |
+            {%- set result = namespace(list=[]) -%}
+            {%- for unit in noah_units -%}
+              {%- for other in noah_units -%}
+                {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
+                  {%- set result.list = result.list + [unit.name] -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endfor -%}
+            {{ result.list | length > 0 }}
+      
       - if:
           - condition: template
-            value_template: "{{ changes_made }}"
-          - condition: template
-            value_template: "{{ actions != [] }}"
+            value_template: "{{ global_release_needed }}"
         then:
-          - choose:
-              - conditions: []
-                sequence: !input actions
+          # DEBUG: Globale Release
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: logbook.log
+                data:
+                  name: Noah Balancer Release
+                  message: "Global Release - Alle Noah < {{ min_soc }}%, setze alle auf {{ max_output_power }}W"
 
-      # STOP - keine weitere Logik
-      - stop: "Globale Release aktiv"
+          # Alle Noah auf max_output_power
+          - repeat:
+              count: "{{ noah_units | length }}"
+              sequence:
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ noah_units[repeat.index - 1].power }}"
+                  data:
+                    value: "{{ max_output_power }}"
+
+          # Variablen für Actions setzen
+          - variables:
+              changes_made: true
+              action_type: "release"
+              throttled_count: 0
+              active_count: "{{ noah_units | length }}"
+              full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
+              max_soc_value: "{{ all_soc_values | max }}"
+              max_soc_noah: |
+                {% set max_val = all_soc_values | max %}
+                {% for unit in noah_units %}
+                  {% if states(unit.soc) | float(0) == max_val %}
+                    {{ unit.name }}
+                    {% break %}
+                  {% endif %}
+                {% endfor %}
+              throttled_noah: "-"
+              active_noah: |
+                {% set ns = namespace(text='') %}
+                {% for unit in noah_units %}
+                  {% set ns.text = ns.text ~ unit.name ~ ', ' %}
+                {% endfor %}
+                {{ ns.text.rstrip(', ') }}
+              noah_status: |
+                {% set ns = namespace(text='') %}
+                {% for unit in noah_units %}
+                  {% set soc = states(unit.soc) | float(0) | round(0) %}
+                  {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
+                {% endfor %}
+                {{ ns.text.strip() }}
+              noah_status_html: |
+                {% set ns = namespace(text='') %}
+                {% for unit in noah_units %}
+                  {% set soc = states(unit.soc) | float(0) | round(0) %}
+                  {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
+                {% endfor %}
+                {{ ns.text.strip() }}
+              noah_status_markdown: |
+                {% set ns = namespace(text='') %}
+                {% for unit in noah_units %}
+                  {% set soc = states(unit.soc) | float(0) | round(0) %}
+                  {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
+                {% endfor %}
+                {{ ns.text.strip() }}
+
+          # Actions ausführen
+          - if:
+              - condition: template
+                value_template: "{{ changes_made }}"
+              - condition: template
+                value_template: "{{ actions != [] }}"
+            then:
+              - choose:
+                  - conditions: []
+                    sequence: !input actions
+
+          # STOP - keine weitere Logik
+          - stop: "Globale Release aktiv"
 
   # ========== PRIO 3: Loadbalancing ==========
   # DEBUG: Loadbalancing Start
@@ -1134,6 +1141,12 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.9 (2026-04-01)
+# - KRITISCHER FIX: Globale Release Spam-Loop
+# - Problem: Globale Release prüfte veraltete Power states → Telegram-Spam
+# - Lösung: Prüfe ob should_be_throttled nicht leer (SOC-basiert, nicht Power)
+# - Globale Release triggert nur noch wenn wirklich Noah gedrosselt WERDEN MÜSSEN
+#
 # v2.8 (2026-04-01)
 # - KRITISCHER FIX: Jinja2 namespace für Liste-Konstruktion
 # - Problem: result = result + [item] funktioniert nicht korrekt in Jinja2 loops

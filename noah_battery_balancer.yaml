@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.11
+  name: Noah Battery Balancer 2.12
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -946,15 +946,22 @@ action:
 
   # PHASE 1: Entscheide basierend auf SOC (NICHT Power) wer gedrosselt/released werden sollte
   - variables:
-      # Welche Noah SOLLTEN gedrosselt sein? (wenn anderer >= max_soc)
+      # Welche Noah SOLLTEN gedrosselt sein? (wenn < max_soc UND andere >= max_soc)
       should_be_throttled: |
         {%- set result = namespace(list=[]) -%}
         {%- for unit in noah_units -%}
-          {%- for other in noah_units -%}
-            {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
+          {%- set current_soc = states(unit.soc) | float(0) -%}
+          {%- if current_soc < max_soc -%}
+            {%- set others_above_max = namespace(found=false) -%}
+            {%- for other in noah_units -%}
+              {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
+                {%- set others_above_max.found = true -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if others_above_max.found -%}
               {%- set result.list = result.list + [unit.name] -%}
             {%- endif -%}
-          {%- endfor -%}
+          {%- endif -%}
         {%- endfor -%}
         {{ result.list | unique | list }}
       
@@ -1141,6 +1148,18 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.12 (2026-04-03)
+# - KRITISCHER FIX: should_be_throttled Logik korrigiert
+# - Problem: "Wenn IRGENDEIN anderer >= max_soc → throttle diesen Noah"
+#   → Bei SOC 43,42,39,40% mit max_soc=42%: ALLE 4 wurden als "should throttle" markiert!
+#   → Loop actions: T=0 R=0 weil ALLE gedrosselt werden sollten (wer bleibt aktiv?)
+#   → Keine Telegram-Nachricht obwohl Drosselung nötig war
+# - Lösung: "Wenn DIESER Noah < max_soc UND andere >= max_soc → throttle"
+#   → Bei SOC 43,42,39,40%: Nur Noah 3,4 (39,40%) werden gedrosselt
+#   → Noah 1,2 (43,42%) bleiben aktiv
+#   → Telegram-Nachricht wird korrekt gesendet
+# - Jetzt funktioniert Loadbalancing wie vorgesehen!
+#
 # v2.11 (2026-04-03)
 # - KRITISCHER FIX: Globale Release Logik vereinfacht
 # - Problem: global_release_needed prüfte ob Noah >= max_soc existieren

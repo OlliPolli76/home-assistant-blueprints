@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.9
+  name: Noah Battery Balancer 2.10
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -368,36 +368,20 @@ blueprint:
         Benachrichtigungen oder andere Aktionen nach jeder Balancing-Änderung.
         
         Verfügbare Variablen:
-        - action_type: Art der Aktion (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
-        - noah_status: Einfache Textliste aller Noah mit SOC und Status
-        - noah_status_html: HTML-formatiert (für Telegram)
-        - noah_status_markdown: Markdown-formatiert
-        - throttled_noah: Liste gedrosselter Noah (Text)
-        - active_noah: Liste aktiver Noah (Text)
-        - throttled_count: Anzahl gedrosselter Noah
-        - active_count: Anzahl aktiver Noah
-        - full_count: Anzahl Noah mit 100% SOC
-        - max_soc_noah: Name des vollsten Noah
-        - max_soc_value: Höchster SOC-Wert
-        - netzbezug: Aktueller Netzbezug (W) - nur bei netzbezug_override
-        - hours_to_sunset: Stunden bis Sonnenuntergang - nur bei dtu_solar
         
-        Notifications or other actions after each balancing change.
-        
-        Available variables:
-        - action_type: Type of action (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
-        - noah_status: Simple text list of all Noah with SOC and status
-        - noah_status_html: HTML formatted (for Telegram)
-        - noah_status_markdown: Markdown formatted
-        - throttled_noah: List of throttled Noah (text)
-        - active_noah: List of active Noah (text)
-        - throttled_count: Count of throttled Noah
-        - active_count: Count of active Noah
-        - full_count: Count of Noah at 100% SOC
-        - max_soc_noah: Name of fullest Noah
-        - max_soc_value: Highest SOC value
-        - netzbezug: Current grid consumption (W) - only for netzbezug_override
-        - hours_to_sunset: Hours until sunset - only for dtu_solar
+        {{action_type}} = Art der Aktion (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
+        {{noah_status}} = Einfache Textliste aller Noah mit SOC und Status
+        {{noah_status_html}} = HTML-formatiert (für Telegram)
+        {{noah_status_markdown}} = Markdown-formatiert
+        {{throttled_noah}} = Liste gedrosselter Noah (Text)
+        {{active_noah}} = Liste aktiver Noah (Text)
+        {{throttled_count}} = Anzahl gedrosselter Noah
+        {{active_count}} = Anzahl aktiver Noah
+        {{full_count}} = Anzahl Noah mit 100% SOC
+        {{max_soc_noah}} = Name des vollsten Noah
+        {{max_soc_value}} = Höchster SOC-Wert
+        {{netzbezug}} = Aktueller Netzbezug in W (nur bei netzbezug_override)
+        {{hours_to_sunset}} = Stunden bis Sonnenuntergang (nur bei dtu_solar)
       default: []
       selector:
         action: {}
@@ -666,6 +650,15 @@ action:
               {% set ns.text = ns.text ~ unit.name ~ ', ' %}
             {% endfor %}
             {{ ns.text.rstrip(', ') }}
+          max_soc_noah: |
+            {% set max_val = all_soc_values | max %}
+            {% for unit in noah_units %}
+              {% if states(unit.soc) | float(0) == max_val %}
+                {{ unit.name }}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+          netzbezug: 0
 
       # Actions ausführen
       - if:
@@ -725,6 +718,25 @@ action:
               {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '%\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
+          throttled_noah: ""
+          active_noah: |
+            {% set ns = namespace(text='') %}
+            {% for unit in noah_units %}
+              {% set ns.text = ns.text ~ unit.name ~ ', ' %}
+            {% endfor %}
+            {{ ns.text.rstrip(', ') }}
+          throttled_count: 0
+          active_count: "{{ noah_units | length }}"
+          max_soc_value: "{{ all_soc_values | max }}"
+          max_soc_noah: |
+            {% set max_val = all_soc_values | max %}
+            {% for unit in noah_units %}
+              {% if states(unit.soc) | float(0) == max_val %}
+                {{ unit.name }}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+          netzbezug: 0
 
       # Actions ausführen
       - if:
@@ -821,6 +833,7 @@ action:
               {% set ns.text = ns.text ~ unit.name ~ ', ' %}
             {% endfor %}
             {{ ns.text.rstrip(', ') }}
+          hours_to_sunset: 0
 
       # Actions ausführen
       - if:
@@ -920,6 +933,8 @@ action:
                   {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
                 {% endfor %}
                 {{ ns.text.strip() }}
+              netzbezug: 0
+              hours_to_sunset: 0
 
           # Actions ausführen
           - if:
@@ -1125,6 +1140,8 @@ action:
               {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (' ~ status ~ ' → ' ~ target_power ~ 'W)\n' %}
             {% endfor %}
             {{ ns.text.strip() }}
+          netzbezug: 0
+          hours_to_sunset: 0
 
       # Actions ausführen (nur wenn Änderungen)
       - if:
@@ -1141,7 +1158,18 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
-# v2.9 (2026-04-01)
+# v2.10 (2026-04-03)
+# - Actions-Beschreibung umformatiert: {{variable}} statt variable: Beschreibung
+# - Alle Variablen werden jetzt IMMER gesetzt (keine undefined errors mehr)
+# - Fehlende Variablen in allen Actions-Blöcken ergänzt:
+#   - DTU Solar: max_soc_noah, netzbezug
+#   - DTU Return: throttled_noah, active_noah, throttled_count, active_count, max_soc_value, max_soc_noah, netzbezug
+#   - Netzbezug Override: hours_to_sunset
+#   - Globale Release: netzbezug, hours_to_sunset
+#   - Loadbalancing: netzbezug, hours_to_sunset
+# - Einfaches Kopieren der Variablen aus Beschreibung in Actions möglich
+#
+# v2.9 (2026-04-03)
 # - KRITISCHER FIX: Globale Release Spam-Loop
 # - Problem: Globale Release prüfte veraltete Power states → Telegram-Spam
 # - Lösung: Prüfe ob should_be_throttled nicht leer (SOC-basiert, nicht Power)

@@ -566,41 +566,28 @@ condition: []
 # ========== ACTIONS ==========
 action:
   # === DEBUG LOGGING ===
-  - service: python_script.noah_balancer_debug
+  - service: shell_command.noah_debug_log
     data:
       timestamp: "{{ now().isoformat() }}"
-      trigger_entity: "{{ trigger.entity_id }}"
-      
-      # SOC Werte
+      trigger: "{{ trigger.entity_id }}"
       soc_ol: "{{ states(noah_1_soc) }}"
       soc_or: "{{ states(noah_2_soc) }}"
       soc_ul: "{{ states(noah_3_soc) }}"
       soc_ur: "{{ states(noah_4_soc) }}"
-      
-      # Power Werte  
       power_ol: "{{ states(noah_1_power) }}"
       power_or: "{{ states(noah_2_power) }}"
       power_ul: "{{ states(noah_3_power) }}"
       power_ur: "{{ states(noah_4_power) }}"
-      
-      # Logic Variables
-      should_be_throttled: "{{ should_be_throttled | default([]) }}"
-      should_be_released: "{{ should_be_released | default([]) }}"
-      throttled_units: "{{ throttled_units | default([]) }}"
-      released_units: "{{ released_units | default([]) }}"
+      should_throttle: "{{ should_be_throttled | default([]) }}"
+      should_release: "{{ should_be_released | default([]) }}"
+      throttled: "{{ throttled_units | default([]) }}"
+      released: "{{ released_units | default([]) }}"
       throttled_count: "{{ throttled_count | default(0) }}"
       active_count: "{{ active_count | default(0) }}"
-      changes_made: "{{ changes_made }}"
-      
-      # Config
+      changes: "{{ changes_made }}"
       max_soc: "{{ max_soc }}"
       min_soc: "{{ min_soc }}"
-      max_output_power: "{{ max_output_power }}"
-      min_output_power: "{{ min_output_power }}"
-      
-      # Additional
-      netzbezug: "{{ states(netzbezug_sensor) if netzbezug_enabled else 'disabled' }}"
-      hours_to_sunset: "{{ hours_until_sunset | round(1) }}"
+
 
   # ========== DEBUG: Variables Check ==========
   - if:

@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.15
+  name: Noah Battery Balancer 2.16
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -885,19 +885,33 @@ action:
               name: Noah Balancer Release
               message: "Global Release - Alle Noah < {{ min_soc }}%, setze alle auf {{ max_output_power }}W"
 
-      # Alle Noah auf max_output_power
+      # Variablen für Tracking
+      - variables:
+          released_units: []
+
+      # Alle Noah auf max_output_power (nur wenn nicht bereits)
       - repeat:
           count: "{{ noah_units | length }}"
           sequence:
-            - action: number.set_value
-              target:
-                entity_id: "{{ noah_units[repeat.index - 1].power }}"
-              data:
-                value: "{{ max_output_power }}"
+            - variables:
+                current_noah: "{{ noah_units[repeat.index - 1] }}"
+                current_power: "{{ states(current_noah.power) | float(0) }}"
+            
+            - if:
+                - condition: template
+                  value_template: "{{ current_power != max_output_power }}"
+              then:
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ current_noah.power }}"
+                  data:
+                    value: "{{ max_output_power }}"
+                - variables:
+                    released_units: "{{ released_units + [current_noah.name] }}"
 
       # Variablen für Actions setzen
       - variables:
-          changes_made: true
+          changes_made: "{{ released_units | length > 0 }}"
           action_type: "release"
           throttled_count: 0
           active_count: "{{ noah_units | length }}"
@@ -1171,6 +1185,17 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.16 (2026-04-03)
+# - KRITISCHER FIX: Globale Release Telegram-Spam
+# - Problem: Globale Release setzte ALLE Noah auf max_power ohne Power-Check
+#   → Bei allen SOC < min_soc: Jede SOC-Änderung triggert set_value
+#   → changes_made immer true → Telegram-Spam
+# - Lösung: Power-Check im Globalen Release Loop
+#   → Nur set_value wenn current_power != max_output_power
+#   → released_units Tracking
+#   → changes_made nur true wenn tatsächlich geändert
+# - Identisch zur Loadbalancing-Loop Logik
+#
 # v2.12 (2026-04-03)
 # - KRITISCHER FIX: should_be_throttled Logik korrigiert
 # - Problem: "Wenn IRGENDEIN anderer >= max_soc → throttle diesen Noah"

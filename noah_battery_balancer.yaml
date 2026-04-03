@@ -565,28 +565,6 @@ condition: []
 
 # ========== ACTIONS ==========
 action:
-  # ========== DEBUG: Variables Check ==========
-  - if:
-      - condition: template
-        value_template: "{{ debug_enabled }}"
-    then:
-      - service: logbook.log
-        data:
-          name: Noah Balancer Debug
-          message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
-
-
-
-
-
-
-
-
-
-action:
-  - variables:
-      # ... alle bestehenden Variablen ...
-      
   # === DEBUG LOGGING ===
   - service: python_script.noah_balancer_debug
     data:
@@ -605,15 +583,14 @@ action:
       power_ul: "{{ states(noah_3_power) }}"
       power_ur: "{{ states(noah_4_power) }}"
       
-      # Logic
-      should_be_throttled: "{{ should_be_throttled }}"
-      should_be_released: "{{ should_be_released }}"
-      throttled_units: "{{ throttled_units }}"
-      released_units: "{{ released_units }}"
-      throttled_count: "{{ throttled_count }}"
-      active_count: "{{ active_count }}"
+      # Logic Variables
+      should_be_throttled: "{{ should_be_throttled | default([]) }}"
+      should_be_released: "{{ should_be_released | default([]) }}"
+      throttled_units: "{{ throttled_units | default([]) }}"
+      released_units: "{{ released_units | default([]) }}"
+      throttled_count: "{{ throttled_count | default(0) }}"
+      active_count: "{{ active_count | default(0) }}"
       changes_made: "{{ changes_made }}"
-      global_release_needed: "{{ global_release_needed }}"
       
       # Config
       max_soc: "{{ max_soc }}"
@@ -622,10 +599,26 @@ action:
       min_output_power: "{{ min_output_power }}"
       
       # Additional
-      netzbezug: "{{ netzbezug }}"
-      hours_to_sunset: "{{ hours_to_sunset }}"
-      max_soc_noah: "{{ max_soc_noah }}"
-      max_soc_value: "{{ max_soc_value }}"
+      netzbezug: "{{ states(netzbezug_sensor) if netzbezug_enabled else 'disabled' }}"
+      hours_to_sunset: "{{ hours_until_sunset | round(1) }}"
+
+  # ========== DEBUG: Variables Check ==========
+  - if:
+      - condition: template
+        value_template: "{{ debug_enabled }}"
+    then:
+      - service: logbook.log
+        data:
+          name: Noah Balancer Debug
+          message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
+
+
+
+
+
+
+
+
 
 
 

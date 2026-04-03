@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.15
+  name: Noah Battery Balancer 2.12
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -565,7 +565,18 @@ condition: []
 
 # ========== ACTIONS ==========
 action:
-  # === DEBUG LOGGING ===
+  # ========== DEBUG: Variables Check ==========
+  - if:
+      - condition: template
+        value_template: "{{ debug_enabled }}"
+    then:
+      - service: logbook.log
+        data:
+          name: Noah Balancer Debug
+          message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
+
+
+  # ========== DEBUG: File Logging ==========
   - service: shell_command.noah_debug_log
     data:
       timestamp: "{{ now().isoformat() }}"
@@ -587,35 +598,6 @@ action:
       changes: "{{ changes_made }}"
       max_soc: "{{ max_soc }}"
       min_soc: "{{ min_soc }}"
-
-
-  # ========== DEBUG: Variables Check ==========
-  - if:
-      - condition: template
-        value_template: "{{ debug_enabled }}"
-    then:
-      - service: logbook.log
-        data:
-          name: Noah Balancer Debug
-          message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   # ========== PRIO 1: DTU Solar-Optimizer ==========
   - if:
       - condition: template

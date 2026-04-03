@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.12
+  name: Noah Battery Balancer 2.13
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -574,6 +574,67 @@ action:
         data:
           name: Noah Balancer Debug
           message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
+
+
+
+
+
+
+
+
+
+action:
+  - variables:
+      # ... alle bestehenden Variablen ...
+      
+  # === DEBUG LOGGING ===
+  - service: python_script.noah_balancer_debug
+    data:
+      timestamp: "{{ now().isoformat() }}"
+      trigger_entity: "{{ trigger.entity_id }}"
+      
+      # SOC Werte
+      soc_ol: "{{ states(noah_1_soc) }}"
+      soc_or: "{{ states(noah_2_soc) }}"
+      soc_ul: "{{ states(noah_3_soc) }}"
+      soc_ur: "{{ states(noah_4_soc) }}"
+      
+      # Power Werte  
+      power_ol: "{{ states(noah_1_power) }}"
+      power_or: "{{ states(noah_2_power) }}"
+      power_ul: "{{ states(noah_3_power) }}"
+      power_ur: "{{ states(noah_4_power) }}"
+      
+      # Logic
+      should_be_throttled: "{{ should_be_throttled }}"
+      should_be_released: "{{ should_be_released }}"
+      throttled_units: "{{ throttled_units }}"
+      released_units: "{{ released_units }}"
+      throttled_count: "{{ throttled_count }}"
+      active_count: "{{ active_count }}"
+      changes_made: "{{ changes_made }}"
+      global_release_needed: "{{ global_release_needed }}"
+      
+      # Config
+      max_soc: "{{ max_soc }}"
+      min_soc: "{{ min_soc }}"
+      max_output_power: "{{ max_output_power }}"
+      min_output_power: "{{ min_output_power }}"
+      
+      # Additional
+      netzbezug: "{{ netzbezug }}"
+      hours_to_sunset: "{{ hours_to_sunset }}"
+      max_soc_noah: "{{ max_soc_noah }}"
+      max_soc_value: "{{ max_soc_value }}"
+
+
+
+
+
+
+
+
+
 
   # ========== PRIO 1: DTU Solar-Optimizer ==========
   - if:

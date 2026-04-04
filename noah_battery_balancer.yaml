@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.19
+  name: Noah Battery Balancer 2.20
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -1084,7 +1084,8 @@ action:
                 released_units: "{{ released_units + [current_noah.name] }}"
                 changes_made: true
 
-  # PHASE 3: Actions Variablen (basiert auf should-Listen, nicht veraltetem states())
+  # PHASE 2.5: Korrektur für should_be_active
+  # Stelle sicher dass ALLE Noah die aktiv sein sollen auch auf max_output_power sind
   - variables:
       # Wer sollte aktiv sein? = Alle außer should_be_throttled
       should_be_active: |
@@ -1095,6 +1096,49 @@ action:
           {%- endif -%}
         {%- endfor -%}
         {{ result.list }}
+
+  - repeat:
+      count: "{{ should_be_active | length }}"
+      sequence:
+        - variables:
+            active_noah_name: "{{ should_be_active[repeat.index - 1] }}"
+            # Finde Noah-Objekt anhand Name
+            active_noah: |
+              {%- for unit in noah_units -%}
+                {%- if unit.name == active_noah_name -%}
+                  {{ unit }}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endfor -%}
+            active_power: "{{ states(active_noah.power) | float(0) }}"
+        
+        # Nur setzen wenn nicht bereits auf max
+        - if:
+            - condition: template
+              value_template: "{{ active_power != max_output_power }}"
+          then:
+            # DEBUG: Korrektur
+            - if:
+                - condition: template
+                  value_template: "{{ debug_enabled }}"
+              then:
+                - service: logbook.log
+                  data:
+                    name: Noah Balancer Correction
+                    message: "{{ active_noah.name }} corrected - Should be active but at {{ active_power }}W → {{ max_output_power }}W"
+            
+            - action: number.set_value
+              target:
+                entity_id: "{{ active_noah.power }}"
+              data:
+                value: "{{ max_output_power }}"
+            
+            # Tracking: Als released_units hinzufügen (da auf max gesetzt)
+            - variables:
+                released_units: "{{ released_units + [active_noah.name] }}"
+                changes_made: true
+
+  # PHASE 3: Actions Variablen (basiert auf should-Listen, nicht veraltetem states())
 
   # DEBUG: Final Units Status
   - if:
@@ -1207,6 +1251,21 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.20 (2026-04-04)
+# - KRITISCHER FIX: Fehlende Aktivierungs-Logik
+# - Problem: Noah in should_be_active wurden NICHT auf max_output_power gesetzt
+#   → Nur Drosseln (should_be_throttled) und Release (should_be_released <= min_soc) funktionierten
+#   → Noah 1 (100%, sollte aktiv sein) blieb auf 0W nach früherem Fehler
+#   → Keine Korrektur bei manuellen Änderungen oder vorherigen Blueprint-Bugs
+# - Lösung: PHASE 2.5 Korrektur-Loop hinzugefügt
+#   → Prüft ALLE Noah in should_be_active
+#   → Setzt auf max_output_power wenn aktuell != max
+#   → Tracked als released_units + changes_made
+# - Robustheit: Korrigiert jetzt automatisch jeden Run
+#   → Manuelle Änderungen werden überschrieben
+#   → Vorherige Blueprint-Fehler werden ausgebügelt
+#   → System konvergiert immer zu korrektem Zustand
+#
 # v2.19 (2026-04-04)
 # - KRITISCHER FIX: Debug-Log Argument-Shift
 # - Problem: Listen mit Spaces zerstören shell_command Argument-Positionen

@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.17
+  name: Noah Battery Balancer 2.18
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -578,8 +578,12 @@ action:
       max_soc_noah: ""
       throttled_noah: ""
       active_noah: ""
+      full_count: 0
       netzbezug: 0
       hours_to_sunset: 0
+      noah_status: ""
+      noah_status_html: ""
+      noah_status_markdown: ""
   
   # ========== DEBUG: Variables Check ==========
   - if:
@@ -592,29 +596,6 @@ action:
           message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
 
 
-  # ========== DEBUG: File Logging ==========
-  - service: shell_command.noah_debug_log
-    data:
-      timestamp: "{{ now().isoformat() }}"
-      trigger: "{{ trigger.id ~ ': ' ~ (trigger.entity_id | default('N/A')) }}"
-      soc_ol: "{{ states(noah_1_soc) }}"
-      soc_or: "{{ states(noah_2_soc) }}"
-      soc_ul: "{{ states(noah_3_soc) }}"
-      soc_ur: "{{ states(noah_4_soc) }}"
-      power_ol: "{{ states(noah_1_power) }}"
-      power_or: "{{ states(noah_2_power) }}"
-      power_ul: "{{ states(noah_3_power) }}"
-      power_ur: "{{ states(noah_4_power) }}"
-      should_throttle: "{{ should_be_throttled | default([]) }}"
-      should_release: "{{ should_be_released | default([]) }}"
-      throttled: "{{ throttled_units | default([]) }}"
-      released: "{{ released_units | default([]) }}"
-      throttled_count: "{{ throttled_count | default(0) }}"
-      active_count: "{{ active_count | default(0) }}"
-      changes: "{{ changes_made }}"
-      max_soc: "{{ max_soc }}"
-      min_soc: "{{ min_soc }}"
-      action_type: "{{ action_type }}"
   # ========== PRIO 1: DTU Solar-Optimizer ==========
   - if:
       - condition: template
@@ -1198,10 +1179,46 @@ action:
               - conditions: []
                 sequence: !input actions
 
+  # ========== DEBUG: File Logging (After All Logic) ==========
+  - service: shell_command.noah_debug_log
+    data:
+      timestamp: "{{ now().isoformat() }}"
+      trigger: "{{ trigger.id ~ ': ' ~ (trigger.entity_id | default('N/A')) }}"
+      soc_ol: "{{ states(noah_1_soc) }}"
+      soc_or: "{{ states(noah_2_soc) }}"
+      soc_ul: "{{ states(noah_3_soc) }}"
+      soc_ur: "{{ states(noah_4_soc) }}"
+      power_ol: "{{ states(noah_1_power) }}"
+      power_or: "{{ states(noah_2_power) }}"
+      power_ul: "{{ states(noah_3_power) }}"
+      power_ur: "{{ states(noah_4_power) }}"
+      should_throttle: "{{ should_be_throttled | default([]) }}"
+      should_release: "{{ should_be_released | default([]) }}"
+      throttled: "{{ throttled_units | default([]) }}"
+      released: "{{ released_units | default([]) }}"
+      throttled_count: "{{ throttled_count | default(0) }}"
+      active_count: "{{ active_count | default(0) }}"
+      changes: "{{ changes_made }}"
+      max_soc: "{{ max_soc }}"
+      min_soc: "{{ min_soc }}"
+      action_type: "{{ action_type }}"
+
 mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.18 (2026-04-04)
+# - KRITISCHER FIX: Debug-Call ans Ende verschoben
+# - Problem: Debug lief VOR Loadbalancing-Logik
+#   → Log zeigte immer "action_type: no_action"
+#   → Echte Actions unsichtbar im Log
+# - Lösung: Debug-Call ans Ende (vor mode: single)
+#   → Logged jetzt NACH allen Actions
+#   → action_type zeigt echte Aktion (loadbalancing/release/dtu_solar etc.)
+# - Fehlende initial variables hinzugefügt:
+#   → full_count, noah_status, noah_status_html, noah_status_markdown
+#   → Verhindert undefined errors in Telegram-Actions
+#
 # v2.17 (2026-04-03)
 # - KRITISCHER FIX: Template undefined errors
 # - Problem 1: Debug-Call (Zeile 596) läuft VOR action_type gesetzt wird

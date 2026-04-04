@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.18
+  name: Noah Battery Balancer 2.19
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -1192,10 +1192,10 @@ action:
       power_or: "{{ states(noah_2_power) }}"
       power_ul: "{{ states(noah_3_power) }}"
       power_ur: "{{ states(noah_4_power) }}"
-      should_throttle: "{{ should_be_throttled | default([]) }}"
-      should_release: "{{ should_be_released | default([]) }}"
-      throttled: "{{ throttled_units | default([]) }}"
-      released: "{{ released_units | default([]) }}"
+      should_throttle: "{{ should_be_throttled | default([]) | to_json }}"
+      should_release: "{{ should_be_released | default([]) | to_json }}"
+      throttled: "{{ throttled_units | default([]) | to_json }}"
+      released: "{{ released_units | default([]) | to_json }}"
       throttled_count: "{{ throttled_count | default(0) }}"
       active_count: "{{ active_count | default(0) }}"
       changes: "{{ changes_made }}"
@@ -1207,6 +1207,20 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.19 (2026-04-04)
+# - KRITISCHER FIX: Debug-Log Argument-Shift
+# - Problem: Listen mit Spaces zerstören shell_command Argument-Positionen
+#   → should_be_throttled = ['Noah 3', 'Noah 4']
+#   → Als String: '[Noah 3, Noah 4]'
+#   → Bash interpretiert als 4 separate Args ([ Noah 3, Noah 4 ])
+#   → Alle nachfolgenden Parameter verschoben!
+#   → Log zeigt: should_throttled="[Noah", throttled_units="3, Noah", action_type="90"
+# - Lösung: Listen als JSON serialisieren
+#   → should_throttle: "{{ should_be_throttled | to_json }}"
+#   → Ergebnis: '["Noah 3", "Noah 4"]' (ein einzelnes Argument)
+#   → Argument-Positionen korrekt
+# - Betrifft: should_throttle, should_release, throttled, released
+#
 # v2.18 (2026-04-04)
 # - KRITISCHER FIX: Debug-Call ans Ende verschoben
 # - Problem: Debug lief VOR Loadbalancing-Logik

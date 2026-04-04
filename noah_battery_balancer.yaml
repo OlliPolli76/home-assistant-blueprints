@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.16
+  name: Noah Battery Balancer 2.17
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -565,6 +565,22 @@ condition: []
 
 # ========== ACTIONS ==========
 action:
+  # ========== Initial Variables ==========
+  - variables:
+      action_type: "no_action"
+      throttled_units: []
+      released_units: []
+      throttled_count: 0
+      active_count: 0
+      should_be_throttled: []
+      should_be_released: []
+      max_soc_value: 0
+      max_soc_noah: ""
+      throttled_noah: ""
+      active_noah: ""
+      netzbezug: 0
+      hours_to_sunset: 0
+  
   # ========== DEBUG: Variables Check ==========
   - if:
       - condition: template
@@ -580,7 +596,7 @@ action:
   - service: shell_command.noah_debug_log
     data:
       timestamp: "{{ now().isoformat() }}"
-      trigger: "{{ trigger.entity_id }}"
+      trigger: "{{ trigger.id ~ ': ' ~ (trigger.entity_id | default('N/A')) }}"
       soc_ol: "{{ states(noah_1_soc) }}"
       soc_or: "{{ states(noah_2_soc) }}"
       soc_ul: "{{ states(noah_3_soc) }}"
@@ -598,6 +614,7 @@ action:
       changes: "{{ changes_made }}"
       max_soc: "{{ max_soc }}"
       min_soc: "{{ min_soc }}"
+      action_type: "{{ action_type }}"
   # ========== PRIO 1: DTU Solar-Optimizer ==========
   - if:
       - condition: template
@@ -1185,6 +1202,20 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.17 (2026-04-03)
+# - KRITISCHER FIX: Template undefined errors
+# - Problem 1: Debug-Call (Zeile 596) läuft VOR action_type gesetzt wird
+#   → Template error "action_type is undefined"
+# - Problem 2: trigger.entity_id ist bei numeric_state/DTU-Triggern leer
+#   → Log zeigt "trigger: ''"
+# - Lösung 1: Initial Variables Block am Anfang
+#   → action_type, throttled_units, released_units etc. auf defaults
+#   → Verhindert undefined errors im Debug-Call
+# - Lösung 2: trigger mit fallback
+#   → "{{ trigger.id ~ ': ' ~ (trigger.entity_id | default('N/A')) }}"
+#   → Log zeigt jetzt z.B. "noah_soc_change: sensor.noah_ol_total_battery_soc"
+# - action_type Parameter zum Debug-Call hinzugefügt (fehlte)
+#
 # v2.16 (2026-04-03)
 # - KRITISCHER FIX: Globale Release Telegram-Spam
 # - Problem: Globale Release setzte ALLE Noah auf max_power ohne Power-Check

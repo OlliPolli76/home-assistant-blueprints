@@ -1,37 +1,30 @@
 blueprint:
-  name: Noah Battery Balancer 2.21
+  name: Noah Battery Balancer 2.22
   description: |
-    Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
-    Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
+    Einfaches, klares Lastmanagement für bis zu 6 Growatt Noah 2000.
+    Pro-Noah Einzelsteuerung ohne komplexe Abhängigkeiten.
     
-    Intelligent load management for up to 6 Growatt Noah 2000 battery storage units.
-    Balances SOC differences via throttling, optimizes grid consumption and controls DTU for zero feed-in.
+    Simple, clear load management for up to 6 Growatt Noah 2000.
+    Per-Noah individual control without complex dependencies.
   
   domain: automation
-
   source_url: https://github.com/OlliPolli76/home-assistant-blueprints/blob/main/noah_battery_balancer.yaml
-
   author: OlliPolli
-
   homeassistant:
     min_version: 2024.1.0
 
   input:
-    # ========== Debug (Optional) ==========
+    # ========== Debug ==========
     debug_enabled:
       name: Debug-Modus
-      description: |
-        Aktiviert Debug-Logging über Logbook-Einträge.
-        
-        Enables debug logging via Logbook entries.
+      description: Aktiviert Debug-Logging
       default: false
       selector:
         boolean:
 
-    # ========== Noah Battery Units (1-6) ==========
+    # ========== Noah Units (1-6) ==========
     noah_1_soc:
       name: Noah 1 - SOC Sensor
-      description: State of Charge Sensor für Noah 1 (0-100%)
       selector:
         entity:
           filter:
@@ -40,7 +33,6 @@ blueprint:
 
     noah_1_power:
       name: Noah 1 - Output Power
-      description: Output Power Steuerung für Noah 1 (0-800W)
       selector:
         entity:
           filter:
@@ -48,8 +40,6 @@ blueprint:
 
     noah_2_soc:
       name: Noah 2 - SOC Sensor
-      description: State of Charge Sensor für Noah 2 (0-100%)
-      # default: []
       selector:
         entity:
           filter:
@@ -58,8 +48,6 @@ blueprint:
 
     noah_2_power:
       name: Noah 2 - Output Power
-      description: Output Power Steuerung für Noah 2 (0-800W)
-      # default: []
       selector:
         entity:
           filter:
@@ -67,7 +55,6 @@ blueprint:
 
     noah_3_soc:
       name: Noah 3 - SOC Sensor
-      description: State of Charge Sensor für Noah 3 (0-100%)
       default: []
       selector:
         entity:
@@ -77,7 +64,6 @@ blueprint:
 
     noah_3_power:
       name: Noah 3 - Output Power
-      description: Output Power Steuerung für Noah 3 (0-800W)
       default: []
       selector:
         entity:
@@ -86,7 +72,6 @@ blueprint:
 
     noah_4_soc:
       name: Noah 4 - SOC Sensor
-      description: State of Charge Sensor für Noah 4 (0-100%)
       default: []
       selector:
         entity:
@@ -96,7 +81,6 @@ blueprint:
 
     noah_4_power:
       name: Noah 4 - Output Power
-      description: Output Power Steuerung für Noah 4 (0-800W)
       default: []
       selector:
         entity:
@@ -105,7 +89,6 @@ blueprint:
 
     noah_5_soc:
       name: Noah 5 - SOC Sensor
-      description: State of Charge Sensor für Noah 5 (0-100%)
       default: []
       selector:
         entity:
@@ -115,7 +98,6 @@ blueprint:
 
     noah_5_power:
       name: Noah 5 - Output Power
-      description: Output Power Steuerung für Noah 5 (0-800W)
       default: []
       selector:
         entity:
@@ -124,7 +106,6 @@ blueprint:
 
     noah_6_soc:
       name: Noah 6 - SOC Sensor
-      description: State of Charge Sensor für Noah 6 (0-100%)
       default: []
       selector:
         entity:
@@ -134,7 +115,6 @@ blueprint:
 
     noah_6_power:
       name: Noah 6 - Output Power
-      description: Output Power Steuerung für Noah 6 (0-800W)
       default: []
       selector:
         entity:
@@ -144,60 +124,39 @@ blueprint:
     # ========== SOC Thresholds ==========
     max_soc:
       name: Max SOC (Drosselung)
-      description: |
-        SOC-Schwelle für Drosselung (Standard: 95%).
-        Batterien über diesem Wert bleiben aktiv, alle anderen werden gedrosselt.
-        
-        SOC threshold for throttling (default: 95%).
-        Batteries above this value stay active, all others will be throttled.
-      default: 95
+      description: Drosseln wenn Noah >= diesem Wert
+      default: 90
       selector:
         number:
-          min: 30
+          min: 50
           max: 100
           step: 1
           unit_of_measurement: "%"
-          mode: slider
 
     min_soc:
       name: Min SOC (Freigabe)
-      description: |
-        SOC-Schwelle für Freigabe (Standard: 85%).
-        Wenn gedrosselte Batterie unter diesen Wert fällt UND keine andere über Max SOC, wird freigegeben.
-        
-        SOC threshold for release (default: 85%).
-        When throttled battery falls below this AND no other above Max SOC, it will be released.
+      description: Freigeben wenn Noah <= diesem Wert
       default: 85
       selector:
         number:
-          min: 30
+          min: 50
           max: 100
           step: 1
           unit_of_measurement: "%"
-          mode: slider
 
     # ========== Power Settings ==========
     min_output_power:
-      name: Min Output Power
-      description: |
-        Minimale Ausgangsleistung beim Drosseln (Standard: 50W, Schritte: 50W).
-        
-        Minimum output power when throttling (default: 50W, steps: 50W).
-      default: 50
+      name: Min Output Power (Drosselung)
+      default: 0
       selector:
         number:
           min: 0
           max: 800
           step: 50
           unit_of_measurement: "W"
-          mode: box
 
     max_output_power:
-      name: Max Output Power
-      description: |
-        Maximale Ausgangsleistung im Normalbetrieb (Standard: 800W, Schritte: 50W).
-        
-        Maximum output power in normal operation (default: 800W, steps: 50W).
+      name: Max Output Power (Normal)
       default: 800
       selector:
         number:
@@ -205,24 +164,16 @@ blueprint:
           max: 800
           step: 50
           unit_of_measurement: "W"
-          mode: box
 
-    # ========== Grid Override (Optional) ==========
+    # ========== Netzbezug Override ==========
     netzbezug_enabled:
       name: Netzbezug-Override aktivieren
-      description: |
-        Aktiviert Notfall-Modus bei hohem Netzbezug.
-        Alle Batterien werden auf Max Power gesetzt wenn Schwelle überschritten.
-        
-        Enables emergency mode for high grid consumption.
-        All batteries set to max power when threshold exceeded.
       default: false
       selector:
         boolean:
 
     netzbezug_sensor:
       name: Netzbezug-Sensor
-      description: Sensor für aktuelle Netzleistung (positiv - Verbrauch)
       default: []
       selector:
         entity:
@@ -231,98 +182,52 @@ blueprint:
               device_class: power
 
     netzbezug_threshold:
-      name: Netzbezug-Schwelle
-      description: Netzbezug-Schwelle in Watt für Override
+      name: Netzbezug-Schwelle (W)
       default: 500
       selector:
         number:
           min: 0
           max: 10000
-          step: 100
-          unit_of_measurement: "W"
-          mode: box
+          step: 50
 
     netzbezug_duration:
-      name: Netzbezug-Verzögerung
-      description: Wie lange muss Schwelle überschritten sein (Sekunden)
+      name: Netzbezug-Verzögerung (s)
       default: 30
       selector:
         number:
           min: 0
           max: 300
           step: 5
-          unit_of_measurement: "s"
-          mode: box
 
     netzbezug_min_soc:
-      name: Netzbezug Min SOC
-      description: |
-        Minimaler SOC für Override
+      name: Netzbezug Min SOC (%)
       default: 20
       selector:
         number:
           min: 0
           max: 100
           step: 5
-          unit_of_measurement: "%"
-          mode: slider
 
     netzbezug_cooldown_minutes:
-      name: Netzbezug Cooldown
-      description: |
-        Wartezeit nach Override bevor erneut aktiviert (Minuten).
-        Verhindert Ping-Pong zwischen Override und Loadbalancing.
+      name: Netzbezug Cooldown (Min)
+      description: Pausiere Basis-Logik nach DPL Mode Änderung
       default: 5
       selector:
         number:
           min: 1
           max: 30
           step: 1
-          unit_of_measurement: "min"
-          mode: box
 
-    netzbezug_off_threshold:
-      name: Netzbezug Deaktivierungs-Schwelle
-      description: |
-        Netzbezug muss unter diesen Wert fallen um Override zu deaktivieren (W).
-      default: 200
-      selector:
-        number:
-          min: 0
-          max: 5000
-          step: 50
-          unit_of_measurement: "W"
-          mode: box
-
-    netzbezug_off_duration:
-      name: Netzbezug Deaktivierungs-Dauer
-      description: |
-        Wie lange muss Netzbezug unter Deaktivierungs-Schwelle bleiben (Sekunden).
-      default: 60
-      selector:
-        number:
-          min: 10
-          max: 300
-          step: 10
-          unit_of_measurement: "s"
-          mode: box
-
-    # ========== DTU Solar Optimizer (Optional) ==========
+    # ========== DTU Solar Optimizer ==========
     dtu_enabled:
       name: DTU Solar-Optimizer aktivieren
-      description: |
-        Aktiviert automatische DTU-Steuerung vor Sonnenuntergang.
-        Bei allen Noah 100% → Einspeisung bis Platz für letzte Sonnenstunden.
-        
-        Enables automatic DTU control before sunset.
-        When all Noah 100% → feed-in until space for last sun hours.
       default: false
       selector:
         boolean:
 
     dtu_mode_select:
       name: DTU DPL Mode Select
-      description: Select-Entity für Dynamic Power Limiter Mode (0 - aktiv, 1 - aus, 2 - deaktiviert)
+      description: "0=aktiv, 1=aus, 2=deaktiviert"
       default: []
       selector:
         entity:
@@ -331,65 +236,32 @@ blueprint:
 
     hours_before_sunset:
       name: Stunden vor Sonnenuntergang
-      description: |
-        Bis wie vielen Stunden vor Sonnenuntergang soll DTU auf Einspeisung schalten (Standard: 2h).
-        
-        Up to how many hours before sunset should the DTU switch to feed-in mode (default: 2 hours).
       default: 2
       selector:
         number:
           min: 0.5
           max: 6
           step: 0.5
-          unit_of_measurement: "h"
-          mode: slider
 
     feed_in_output_power:
-      name: Einspeisung Output Power
-      description: |
-        Output Power während Einspeisung (DPL Mode 2).
-        Standard: 400W pro Noah.
-        
-        Output power during feed-in (DPL Mode 2).
-        Default: 400W per Noah.
+      name: Einspeisung Output Power (W)
       default: 400
       selector:
         number:
           min: 0
           max: 800
           step: 50
-          unit_of_measurement: "W"
-          mode: box
 
-    # ========== Actions (Optional) ==========
+    # ========== Actions ==========
     actions:
       name: Aktionen
-      description: |
-        Benachrichtigungen oder andere Aktionen nach jeder Balancing-Änderung.
-        
-        Verfügbare Variablen:
-        
-        {{{{action_type}}}} = Art der Aktion (dtu_solar, dtu_return, netzbezug_override, loadbalancing, release)
-        {{{{noah_status}}}} = Einfache Textliste aller Noah mit SOC und Status
-        {{{{noah_status_html}}}} = HTML-formatiert (für Telegram)
-        {{{{noah_status_markdown}}}} = Markdown-formatiert
-        {{{{throttled_noah}}}} = Liste gedrosselter Noah (Text)
-        {{{{active_noah}}}} = Liste aktiver Noah (Text)
-        {{{{throttled_count}}}} = Anzahl gedrosselter Noah
-        {{{{active_count}}}} = Anzahl aktiver Noah
-        {{{{full_count}}}} = Anzahl Noah mit 100% SOC
-        {{{{max_soc_noah}}}} = Name des vollsten Noah
-        {{{{max_soc_value}}}} = Höchster SOC-Wert
-        {{{{netzbezug}}}} = Aktueller Netzbezug in W (nur bei netzbezug_override)
-        {{{{hours_to_sunset}}}} = Stunden bis Sonnenuntergang (nur bei dtu_solar)
+      description: Benachrichtigungen nach Änderungen
       default: []
       selector:
         action: {}
 
 # ========== VARIABLES ==========
-
 variables:
-  # ========== Blueprint-Inputs als Variablen laden ==========
   debug_enabled: !input debug_enabled
   noah_1_soc: !input noah_1_soc
   noah_1_power: !input noah_1_power
@@ -413,218 +285,91 @@ variables:
   netzbezug_duration: !input netzbezug_duration
   netzbezug_min_soc: !input netzbezug_min_soc
   netzbezug_cooldown_minutes: !input netzbezug_cooldown_minutes
-  netzbezug_off_threshold: !input netzbezug_off_threshold
-  netzbezug_off_duration: !input netzbezug_off_duration
   dtu_enabled: !input dtu_enabled
   dtu_mode_select: !input dtu_mode_select
   hours_before_sunset: !input hours_before_sunset
   feed_in_output_power: !input feed_in_output_power
   actions: !input actions
-  changes_made: false
-  
-  # Noah-Konfiguration sammeln
+
   noah_units: |
     {%- set units = [] -%}
-    {%- if noah_1_soc not in ['', None, []] and noah_1_power not in ['', None, []] -%}
+    {%- if noah_1_soc != [] and noah_1_power != [] -%}
       {%- set units = units + [{'soc': noah_1_soc, 'power': noah_1_power, 'name': 'Noah 1'}] -%}
     {%- endif -%}
-    {%- if noah_2_soc not in ['', None, []] and noah_2_power not in ['', None, []] -%}
+    {%- if noah_2_soc != [] and noah_2_power != [] -%}
       {%- set units = units + [{'soc': noah_2_soc, 'power': noah_2_power, 'name': 'Noah 2'}] -%}
     {%- endif -%}
-    {%- if noah_3_soc not in ['', None, []] and noah_3_power not in ['', None, []] -%}
+    {%- if noah_3_soc != [] and noah_3_power != [] -%}
       {%- set units = units + [{'soc': noah_3_soc, 'power': noah_3_power, 'name': 'Noah 3'}] -%}
     {%- endif -%}
-    {%- if noah_4_soc not in ['', None, []] and noah_4_power not in ['', None, []] -%}
+    {%- if noah_4_soc != [] and noah_4_power != [] -%}
       {%- set units = units + [{'soc': noah_4_soc, 'power': noah_4_power, 'name': 'Noah 4'}] -%}
     {%- endif -%}
-    {%- if noah_5_soc not in ['', None, []] and noah_5_power not in ['', None, []] -%}
+    {%- if noah_5_soc != [] and noah_5_power != [] -%}
       {%- set units = units + [{'soc': noah_5_soc, 'power': noah_5_power, 'name': 'Noah 5'}] -%}
     {%- endif -%}
-    {%- if noah_6_soc not in ['', None, []] and noah_6_power not in ['', None, []] -%}
+    {%- if noah_6_soc != [] and noah_6_power != [] -%}
       {%- set units = units + [{'soc': noah_6_soc, 'power': noah_6_power, 'name': 'Noah 6'}] -%}
     {%- endif -%}
     {{ units }}
 
-  # Alle SOC-Werte sammeln
-  all_soc_values: |
-    {%- set values = [] -%}
-    {%- if noah_1_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_2_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_3_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_4_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_5_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_6_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-    {%- endif -%}
-    {{ values }}
-
-  # Prüfen ob alle Noah 100%
-  all_at_100: |
-    {%- set values = [] -%}
-    {%- if noah_1_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_2_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_3_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_4_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_5_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_6_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-    {%- endif -%}
-    {{ values | min >= 100 if values else false }}
-
-  # Prüfen ob mindestens einer unter 100%
-  any_below_100: |
-    {%- set values = [] -%}
-    {%- if noah_1_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_1_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_2_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_2_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_3_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_3_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_4_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_4_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_5_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_5_soc) | float(0)] -%}
-    {%- endif -%}
-    {%- if noah_6_soc not in ['', None, []] -%}
-      {%- set values = values + [states(noah_6_soc) | float(0)] -%}
-    {%- endif -%}
-    {{ values | min < 100 if values else false }}
-
-  # Zeit bis Sonnenuntergang in Stunden
-  hours_until_sunset: >
+  hours_until_sunset: |
     {% set sunset = state_attr('sun.sun', 'next_setting') | as_datetime %}
-    {% set now = now() %}
-    {{ (sunset - now).total_seconds() / 3600 }}
+    {{ (sunset - now()).total_seconds() / 3600 }}
 
 # ========== TRIGGER ==========
 trigger:
-  # Trigger auf alle konfigurierten Noah SOC-Änderungen
   - platform: state
     entity_id: !input noah_1_soc
-    id: noah_soc_change
-
   - platform: state
     entity_id: !input noah_2_soc
-    id: noah_soc_change
-
   - platform: state
     entity_id: !input noah_3_soc
-    id: noah_soc_change
-
   - platform: state
     entity_id: !input noah_4_soc
-    id: noah_soc_change
-
   - platform: state
     entity_id: !input noah_5_soc
-    id: noah_soc_change
-
   - platform: state
     entity_id: !input noah_6_soc
-    id: noah_soc_change
-
-  # Netzbezug-Trigger (wenn konfiguriert)
   - platform: numeric_state
     entity_id: !input netzbezug_sensor
     above: !input netzbezug_threshold
     for:
       seconds: !input netzbezug_duration
-    id: netzbezug_override
 
-  # DTU Mode-Trigger (für manuelle Rückkehr zu Auto)
-  - platform: state
-    entity_id: !input dtu_mode_select
-    id: dtu_mode_change
-
-# ========== CONDITIONS ==========
 condition: []
 
 # ========== ACTIONS ==========
 action:
-  # ========== Initial Variables ==========
+  # Initial variables
   - variables:
       action_type: "no_action"
+      changes_made: false
       throttled_units: []
       released_units: []
-      throttled_count: 0
-      active_count: 0
-      should_be_throttled: []
-      should_be_released: []
-      max_soc_value: 0
-      max_soc_noah: ""
-      throttled_noah: ""
-      active_noah: ""
-      full_count: 0
-      netzbezug: 0
-      hours_to_sunset: 0
-      noah_status: ""
-      noah_status_html: ""
-      noah_status_markdown: ""
-  
-  # ========== DEBUG: Variables Check ==========
-  - if:
-      - condition: template
-        value_template: "{{ debug_enabled }}"
-    then:
-      - service: logbook.log
-        data:
-          name: Noah Balancer Debug
-          message: "Variables - Units: {{ noah_units | length }}, SOC: {{ all_soc_values | min }}-{{ all_soc_values | max }}%, All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h"
-
 
   # ========== PRIO 1: DTU Solar-Optimizer ==========
   - if:
       - condition: template
-        value_template: "{{ dtu_enabled }}"
+        value_template: "{{ dtu_enabled and dtu_mode_select != [] }}"
       - condition: template
-        value_template: "{{ all_at_100 }}"
+        value_template: |
+          {% set all_100 = true %}
+          {% for unit in noah_units %}
+            {% if states(unit.soc) | float(0) < 100 %}
+              {% set all_100 = false %}
+            {% endif %}
+          {% endfor %}
+          {{ all_100 }}
       - condition: template
         value_template: "{{ hours_until_sunset > hours_before_sunset }}"
-      - condition: template
-        value_template: "{{ dtu_mode_select != [] }}"
     then:
-      # DEBUG: DTU Solar-Optimizer Start
-      - if:
-          - condition: template
-            value_template: "{{ debug_enabled }}"
-        then:
-          - service: logbook.log
-            data:
-              name: Noah Balancer DTU
-              message: "Solar Override - All@100: {{ all_at_100 }}, Sunset: {{ hours_until_sunset }}h (threshold: {{ hours_before_sunset }}h), Mode→2, Power→{{ feed_in_output_power }}W"
-
-      # DTU Mode auf 2 (deaktiviert = Einspeisung)
       - action: select.select_option
         target:
-          entity_id: !input dtu_mode_select
+          entity_id: "{{ dtu_mode_select }}"
         data:
           option: "2"
-
-      # Alle Noah auf Einspeisung-Power setzen
+      
       - repeat:
           count: "{{ noah_units | length }}"
           sequence:
@@ -633,55 +378,11 @@ action:
                 entity_id: "{{ noah_units[repeat.index - 1].power }}"
               data:
                 value: "{{ feed_in_output_power }}"
-
-      # Variablen für Actions setzen
+      
       - variables:
-          changes_made: true
           action_type: "dtu_solar"
-          hours_to_sunset: "{{ hours_until_sunset | round(1) }}"
-          full_count: "{{ noah_units | length }}"
-          active_count: "{{ noah_units | length }}"
-          throttled_count: 0
-          max_soc_value: 100
-          noah_status: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (Einspeisung ' ~ feed_in_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_html: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (Einspeisung ' ~ feed_in_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_markdown: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (Einspeisung ' ~ feed_in_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          throttled_noah: ""
-          active_noah: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set ns.text = ns.text ~ unit.name ~ ', ' %}
-            {% endfor %}
-            {{ ns.text.rstrip(', ') }}
-          max_soc_noah: |
-            {% set max_val = all_soc_values | max %}
-            {% for unit in noah_units %}
-              {% if states(unit.soc) | float(0) == max_val %}
-                {{ unit.name }}
-                {% break %}
-              {% endif %}
-            {% endfor %}
-          netzbezug: 0
-
-      # Actions ausführen
+          changes_made: true
+      
       - if:
           - condition: template
             value_template: "{{ actions != [] }}"
@@ -689,77 +390,36 @@ action:
           - choose:
               - conditions: []
                 sequence: !input actions
+      
+      - stop: "DTU Solar aktiv"
 
-      # STOP - keine weitere Logik
-      - stop: "DTU Solar-Optimizer aktiv"
-
-  # DTU Rückschaltung: Wenn Mode 2 aktiv und mindestens ein Noah < 100%
+  # ========== DTU Return ==========
   - if:
       - condition: template
-        value_template: "{{ dtu_enabled }}"
-      - condition: template
-        value_template: "{{ dtu_mode_select != [] }}"
+        value_template: "{{ dtu_enabled and dtu_mode_select != [] }}"
       - condition: state
         entity_id: !input dtu_mode_select
         state: "2"
       - condition: template
-        value_template: "{{ any_below_100 }}"
+        value_template: |
+          {% set any_below_100 = false %}
+          {% for unit in noah_units %}
+            {% if states(unit.soc) | float(0) < 100 %}
+              {% set any_below_100 = true %}
+            {% endif %}
+          {% endfor %}
+          {{ any_below_100 }}
     then:
-      # DTU Mode zurück auf 0 (aktiv)
       - action: select.select_option
         target:
-          entity_id: !input dtu_mode_select
+          entity_id: "{{ dtu_mode_select }}"
         data:
           option: "0"
-
-      # Variablen für Actions setzen
+      
       - variables:
-          changes_made: true
           action_type: "dtu_return"
-          hours_to_sunset: "{{ hours_until_sunset | round(1) }}"
-          full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
-          noah_status: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '%\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_html: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '%\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_markdown: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '%\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          throttled_noah: ""
-          active_noah: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set ns.text = ns.text ~ unit.name ~ ', ' %}
-            {% endfor %}
-            {{ ns.text.rstrip(', ') }}
-          throttled_count: 0
-          active_count: "{{ noah_units | length }}"
-          max_soc_value: "{{ all_soc_values | max }}"
-          max_soc_noah: |
-            {% set max_val = all_soc_values | max %}
-            {% for unit in noah_units %}
-              {% if states(unit.soc) | float(0) == max_val %}
-                {{ unit.name }}
-                {% break %}
-              {% endif %}
-            {% endfor %}
-          netzbezug: 0
-
-      # Actions ausführen
+          changes_made: true
+      
       - if:
           - condition: template
             value_template: "{{ actions != [] }}"
@@ -768,46 +428,47 @@ action:
               - conditions: []
                 sequence: !input actions
 
-  # ========== PRIO 2: Netzbezug-Override ==========
+  # ========== PRIO 2: Netzbezug Override ==========
   - if:
       - condition: template
-        value_template: "{{ netzbezug_enabled }}"
-      - condition: template
-        value_template: "{{ netzbezug_sensor != [] }}"
+        value_template: "{{ netzbezug_enabled and netzbezug_sensor != [] }}"
       - condition: numeric_state
         entity_id: !input netzbezug_sensor
         above: !input netzbezug_threshold
       - condition: template
-        value_template: "{{ all_soc_values | min >= netzbezug_min_soc }}"
-      # NEU: Mindestens 1 Noah NICHT auf max_output_power
-      - condition: template
-        value_template: >
-          {% set any_not_max = namespace(found=false) %}
+        value_template: |
+          {% set all_above_min = true %}
           {% for unit in noah_units %}
-            {% if states(unit.power) | float(0) < max_output_power %}
-              {% set any_not_max.found = true %}
+            {% if states(unit.soc) | float(0) < netzbezug_min_soc %}
+              {% set all_above_min = false %}
             {% endif %}
           {% endfor %}
-          {{ any_not_max.found }}
-      # NEU: Cooldown - Letzte Änderung > cooldown_minutes
+          {{ all_above_min }}
       - condition: template
-        value_template: >
-          {% set power_entities = noah_units | map(attribute='power') | list %}
-          {% set last_changes = [] %}
-          {% for entity in power_entities %}
-            {% set last_change_attr = state_attr(entity, 'last_changed') %}
-            {% if last_change_attr is not none %}
-              {% set last_changes = last_changes + [as_timestamp(last_change_attr)] %}
-            {% endif %}
-          {% endfor %}
-          {% if last_changes | length > 0 %}
-            {% set newest_change = last_changes | max %}
-            {{ (now().timestamp() - newest_change) > (netzbezug_cooldown_minutes * 60) }}
+        value_template: |
+          {% if dtu_mode_select == [] %}
+            {{ true }}
           {% else %}
-            true
+            {% set last_change = state_attr(dtu_mode_select, 'last_changed') | as_datetime %}
+            {% if last_change is none %}
+              {{ true }}
+            {% else %}
+              {{ (now() - last_change).total_seconds() / 60 >= netzbezug_cooldown_minutes }}
+            {% endif %}
           {% endif %}
     then:
-      # Alle Noah auf Max Power
+      # DPL Mode aktivieren falls nicht aktiv
+      - if:
+          - condition: template
+            value_template: "{{ dtu_mode_select != [] and states(dtu_mode_select) != '0' }}"
+        then:
+          - action: select.select_option
+            target:
+              entity_id: "{{ dtu_mode_select }}"
+            data:
+              option: "0"
+      
+      # Alle Noah auf max
       - repeat:
           count: "{{ noah_units | length }}"
           sequence:
@@ -816,47 +477,11 @@ action:
                 entity_id: "{{ noah_units[repeat.index - 1].power }}"
               data:
                 value: "{{ max_output_power }}"
-
-      # Variablen für Actions setzen
+      
       - variables:
-          changes_made: true
           action_type: "netzbezug_override"
-          netzbezug: "{{ states(netzbezug_sensor) | float(0) | round(0) }}"
-          active_count: "{{ noah_units | length }}"
-          throttled_count: 0
-          full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
-          max_soc_value: "{{ all_soc_values | max }}"
-          noah_status: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (Max Power ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_html: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (Max Power ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_markdown: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (Max Power ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          throttled_noah: ""
-          active_noah: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set ns.text = ns.text ~ unit.name ~ ', ' %}
-            {% endfor %}
-            {{ ns.text.rstrip(', ') }}
-          hours_to_sunset: 0
-
-      # Actions ausführen
+          changes_made: true
+      
       - if:
           - condition: template
             value_template: "{{ actions != [] }}"
@@ -864,158 +489,36 @@ action:
           - choose:
               - conditions: []
                 sequence: !input actions
+      
+      - stop: "Override aktiv"
 
-      # STOP
-      - stop: "Netzbezug-Override aktiv"
-
-  # ========== Globale Release: Alle Noah < min_soc ==========
+  # ========== PRIO 3: Cooldown Check ==========
   - if:
       - condition: template
-        value_template: "{{ all_soc_values | max < min_soc }}"
+        value_template: |
+          {% if dtu_mode_select == [] %}
+            {{ false }}
+          {% else %}
+            {% set last_change = state_attr(dtu_mode_select, 'last_changed') | as_datetime %}
+            {% if last_change is none %}
+              {{ false }}
+            {% else %}
+              {{ (now() - last_change).total_seconds() / 60 < netzbezug_cooldown_minutes }}
+            {% endif %}
+          {% endif %}
     then:
-      # DEBUG: Globale Release
       - if:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
           - service: logbook.log
             data:
-              name: Noah Balancer Release
-              message: "Global Release - Alle Noah < {{ min_soc }}%, setze alle auf {{ max_output_power }}W"
-
-      # Variablen für Tracking
-      - variables:
-          released_units: []
-
-      # Alle Noah auf max_output_power (nur wenn nicht bereits)
-      - repeat:
-          count: "{{ noah_units | length }}"
-          sequence:
-            - variables:
-                current_noah: "{{ noah_units[repeat.index - 1] }}"
-                current_power: "{{ states(current_noah.power) | float(0) }}"
-            
-            - if:
-                - condition: template
-                  value_template: "{{ current_power != max_output_power }}"
-              then:
-                - action: number.set_value
-                  target:
-                    entity_id: "{{ current_noah.power }}"
-                  data:
-                    value: "{{ max_output_power }}"
-                - variables:
-                    released_units: "{{ released_units + [current_noah.name] }}"
-
-      # Variablen für Actions setzen
-      - variables:
-          changes_made: "{{ released_units | length > 0 }}"
-          action_type: "release"
-          throttled_count: 0
-          active_count: "{{ noah_units | length }}"
-          full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
-          max_soc_value: "{{ all_soc_values | max }}"
-          max_soc_noah: |
-            {% set max_val = all_soc_values | max %}
-            {% for unit in noah_units %}
-              {% if states(unit.soc) | float(0) == max_val %}
-                {{ unit.name }}
-                {% break %}
-              {% endif %}
-            {% endfor %}
-          throttled_noah: "-"
-          active_noah: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set ns.text = ns.text ~ unit.name ~ ', ' %}
-            {% endfor %}
-            {{ ns.text.rstrip(', ') }}
-          noah_status: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_html: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_markdown: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (Freigegeben ' ~ max_output_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          netzbezug: 0
-          hours_to_sunset: 0
-
-      # Actions ausführen
-      - if:
-          - condition: template
-            value_template: "{{ changes_made }}"
-          - condition: template
-            value_template: "{{ actions != [] }}"
-        then:
-          - choose:
-              - conditions: []
-                sequence: !input actions
-
-      # STOP - keine weitere Logik
-      - stop: "Globale Release aktiv"
-
-  # ========== PRIO 3: Loadbalancing ==========
-  # DEBUG: Loadbalancing Start
-  - if:
-      - condition: template
-        value_template: "{{ debug_enabled }}"
-    then:
-      - service: logbook.log
-        data:
-          name: Noah Balancer Loadbalancing
-          message: "Start - Units: {{ noah_units | length }}, Thresholds: max {{ max_soc }}% / min {{ min_soc }}%"
-
-  # PHASE 1: Entscheide basierend auf SOC (NICHT Power) wer gedrosselt/released werden sollte
-  - variables:
-      # Welche Noah SOLLTEN gedrosselt sein? (wenn < max_soc UND andere >= max_soc)
-      should_be_throttled: |
-        {%- set result = namespace(list=[]) -%}
-        {%- for unit in noah_units -%}
-          {%- set current_soc = states(unit.soc) | float(0) -%}
-          {%- if current_soc < max_soc -%}
-            {%- set others_above_max = namespace(found=false) -%}
-            {%- for other in noah_units -%}
-              {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
-                {%- set others_above_max.found = true -%}
-              {%- endif -%}
-            {%- endfor -%}
-            {%- if others_above_max.found -%}
-              {%- set result.list = result.list + [unit.name] -%}
-            {%- endif -%}
-          {%- endif -%}
-        {%- endfor -%}
-        {{ result.list | unique | list }}
+              name: Noah Balancer Cooldown
+              message: "Cooldown aktiv - DPL Mode geändert vor {{ ((now() - (state_attr(dtu_mode_select, 'last_changed') | as_datetime)).total_seconds() / 60) | round(1) }} Min"
       
-      # Welche Noah SOLLTEN released sein? (wenn <= min_soc UND kein anderer >= max_soc)
-      should_be_released: |
-        {%- set result = namespace(list=[]) -%}
-        {%- for unit in noah_units -%}
-          {%- set current_soc = states(unit.soc) | float(0) -%}
-          {%- if current_soc <= min_soc -%}
-            {%- set result.list = result.list + [unit.name] -%}
-          {%- endif -%}
-        {%- endfor -%}
-        {{ result.list | unique | list }}
-      
-      # Variablen für tatsächlich durchgeführte Actions
-      throttled_units: []
-      released_units: []
+      - stop: "Cooldown aktiv"
 
-  # PHASE 2: Für jeden Noah - Setze nur wenn Power != Ziel
+  # ========== PRIO 4: Basis-Logik (Pro Noah einzeln) ==========
   - repeat:
       count: "{{ noah_units | length }}"
       sequence:
@@ -1024,158 +527,61 @@ action:
             current_soc: "{{ states(current_noah.soc) | float(0) }}"
             current_power: "{{ states(current_noah.power) | float(0) }}"
 
-        # DEBUG: Loop Iteration
+        # DROSSELN wenn >= max_soc UND Power != min
         - if:
             - condition: template
-              value_template: "{{ debug_enabled }}"
-          then:
-            - service: logbook.log
-              data:
-                name: Noah Balancer Loop
-                message: "#{{ repeat.index }} {{ current_noah.name }} - SOC: {{ current_soc }}%, Power: {{ current_power }}W, Should throttle: {{ current_noah.name in should_be_throttled }}, Should release: {{ current_noah.name in should_be_released }}"
-
-        # DROSSELN wenn dieser Noah in should_be_throttled UND Power != min
-        - if:
-            - condition: template
-              value_template: "{{ current_noah.name in should_be_throttled }}"
-            - condition: template
-              value_template: "{{ current_power != min_output_power }}"
+              value_template: "{{ current_soc >= max_soc and current_power != min_output_power }}"
           then:
             - action: number.set_value
               target:
                 entity_id: "{{ current_noah.power }}"
               data:
                 value: "{{ min_output_power }}"
+            
             - variables:
                 throttled_units: "{{ throttled_units + [current_noah.name] }}"
                 changes_made: true
 
-        # RELEASE wenn dieser Noah in should_be_released UND Power != max
+        # FREIGEBEN wenn <= min_soc UND Power != max
         - if:
             - condition: template
-              value_template: "{{ current_noah.name in should_be_released }}"
-            - condition: template
-              value_template: "{{ current_power != max_output_power }}"
+              value_template: "{{ current_soc <= min_soc and current_power != max_output_power }}"
           then:
-            # DEBUG: Release
+            # DPL Mode aktivieren falls nicht aktiv
             - if:
                 - condition: template
-                  value_template: "{{ debug_enabled }}"
+                  value_template: "{{ dtu_mode_select != [] and states(dtu_mode_select) != '0' }}"
               then:
-                - service: logbook.log
+                - action: select.select_option
+                  target:
+                    entity_id: "{{ dtu_mode_select }}"
                   data:
-                    name: Noah Balancer Release
-                    message: "{{ current_noah.name }} released - SOC: {{ current_soc }}% ≤ {{ min_soc }}%, Power: {{ current_power }}W → {{ max_output_power }}W"
+                    option: "0"
             
             - action: number.set_value
               target:
                 entity_id: "{{ current_noah.power }}"
               data:
                 value: "{{ max_output_power }}"
+            
             - variables:
                 released_units: "{{ released_units + [current_noah.name] }}"
                 changes_made: true
 
-  # PHASE 3: Actions Variablen (basiert auf should-Listen, nicht veraltetem states())
-  - variables:
-      # Wer sollte aktiv sein? = Alle außer should_be_throttled
-      should_be_active: |
-        {%- set result = namespace(list=[]) -%}
-        {%- for unit in noah_units -%}
-          {%- if unit.name not in should_be_throttled -%}
-            {%- set result.list = result.list + [unit.name] -%}
-          {%- endif -%}
-        {%- endfor -%}
-        {{ result.list }}
-
-  # DEBUG: Final Units Status
-  - if:
-      - condition: template
-        value_template: "{{ debug_enabled }}"
-    then:
-      - service: logbook.log
-        data:
-          name: Noah Balancer Status
-          message: "Should throttle: {{ should_be_throttled | join(', ') or 'none' }} ({{ should_be_throttled | length }}), Should active: {{ should_be_active | join(', ') or 'none' }} ({{ should_be_active | length }}), Loop actions: T={{ throttled_units | length }} R={{ released_units | length }}"
-
-  # Variablen für Actions setzen (nur wenn Änderungen)
-  - if:
-      - condition: template
-        value_template: "{{ throttled_units | length > 0 or released_units | length > 0 }}"
-    then:
-      - variables:
-          changes_made: true
-          action_type: "{{ 'release' if released_units | length > 0 else 'loadbalancing' }}"
-          throttled_count: "{{ should_be_throttled | length }}"
-          active_count: "{{ should_be_active | length }}"
-          full_count: "{{ all_soc_values | select('>=', 100) | list | length }}"
-          max_soc_value: "{{ all_soc_values | max }}"
-          max_soc_noah: |
-            {% set max_val = all_soc_values | max %}
-            {% for unit in noah_units %}
-              {% if states(unit.soc) | float(0) == max_val %}
-                {{ unit.name }}
-                {% break %}
-              {% endif %}
-            {% endfor %}
-          throttled_noah: |
-            {% if should_be_throttled | length > 0 %}
-              {{ should_be_throttled | join(', ') }}
-            {% else %}
-              -
-            {% endif %}
-          active_noah: |
-            {% if should_be_active | length > 0 %}
-              {{ should_be_active | join(', ') }}
-            {% else %}
-              -
-            {% endif %}
-          noah_status: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in should_be_throttled else 'Aktiv' %}
-              {% set target_power = min_output_power if unit.name in should_be_throttled else max_output_power %}
-              {% set ns.text = ns.text ~ unit.name ~ ': ' ~ soc ~ '% (' ~ status ~ ' → ' ~ target_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_html: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in should_be_throttled else 'Aktiv' %}
-              {% set target_power = min_output_power if unit.name in should_be_throttled else max_output_power %}
-              {% set ns.text = ns.text ~ '<b>' ~ unit.name ~ '</b>: ' ~ soc ~ '% (' ~ status ~ ' → ' ~ target_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          noah_status_markdown: |
-            {% set ns = namespace(text='') %}
-            {% for unit in noah_units %}
-              {% set soc = states(unit.soc) | float(0) | round(0) %}
-              {% set status = 'Gedrosselt' if unit.name in should_be_throttled else 'Aktiv' %}
-              {% set target_power = min_output_power if unit.name in should_be_throttled else max_output_power %}
-              {% set ns.text = ns.text ~ '**' ~ unit.name ~ '**: ' ~ soc ~ '% (' ~ status ~ ' → ' ~ target_power ~ 'W)\n' %}
-            {% endfor %}
-            {{ ns.text.strip() }}
-          netzbezug: 0
-          hours_to_sunset: 0
-
-      # Actions ausführen (nur wenn Änderungen)
-      - if:
-          - condition: template
-            value_template: "{{ changes_made }}"
-          - condition: template
-            value_template: "{{ actions != [] }}"
-        then:
-          - choose:
-              - conditions: []
-                sequence: !input actions
-
-  # ========== Final action_type setzen für Debug ==========
+  # action_type final setzen
   - variables:
       action_type: "{{ 'release' if released_units | length > 0 else ('loadbalancing' if throttled_units | length > 0 else 'no_action') }}"
 
-  # ========== DEBUG: File Logging (After All Logic) ==========
+  # Actions ausführen
+  - if:
+      - condition: template
+        value_template: "{{ changes_made and actions != [] }}"
+    then:
+      - choose:
+          - conditions: []
+            sequence: !input actions
+
+  # Debug-Log
   - service: shell_command.noah_debug_log
     data:
       timestamp: "{{ now().isoformat() }}"
@@ -1188,12 +594,12 @@ action:
       power_or: "{{ states(noah_2_power) }}"
       power_ul: "{{ states(noah_3_power) }}"
       power_ur: "{{ states(noah_4_power) }}"
-      should_throttle: "{{ should_be_throttled | default([]) | to_json }}"
-      should_release: "{{ should_be_released | default([]) | to_json }}"
-      throttled: "{{ throttled_units | default([]) | to_json }}"
-      released: "{{ released_units | default([]) | to_json }}"
-      throttled_count: "{{ throttled_count | default(0) }}"
-      active_count: "{{ active_count | default(0) }}"
+      should_throttle: "[]"
+      should_release: "[]"
+      throttled: "{{ throttled_units | to_json }}"
+      released: "{{ released_units | to_json }}"
+      throttled_count: "{{ throttled_units | length }}"
+      active_count: "{{ noah_units | length - throttled_units | length }}"
       changes: "{{ changes_made }}"
       max_soc: "{{ max_soc }}"
       min_soc: "{{ min_soc }}"
@@ -1201,6 +607,36 @@ action:
 
 mode: single
 max_exceeded: silent
+
+# ========== CHANGELOG ==========
+# v2.22 (2026-04-06)
+# - KOMPLETT NEU: Einfache, klare Pro-Noah-Logik
+# 
+# ALTE Logik (v2.21 und früher):
+# - should_be_throttled: < max_soc wenn andere >= max_soc
+# - should_be_released: <= min_soc wenn keine anderen >= max_soc
+# → Zu komplex, Konflikte, Ping-Pong
+# 
+# NEUE Logik v2.22:
+# - Pro Noah einzeln: >= max_soc → drosseln, <= min_soc → freigeben
+# - Keine Abhängigkeit von anderen Noah
+# - Keine should-Listen mehr
+# 
+# PRIORITÄTEN (in dieser Reihenfolge):
+# 1. DTU Solar: Alle 100% + vor Sonnenuntergang → DPL=2, alle 400W
+# 2. DTU Return: DPL=2 + min 1 < 100% → DPL=0
+# 3. Override: Netzbezug > Schwelle → DPL=0, alle 800W
+# 4. Cooldown: DPL Mode geändert < Cooldown → SKIP Basis
+# 5. Basis: Pro Noah >= 90% → 0W, <= 85% → 800W + DPL=0
+# 
+# FIXES:
+# - Cooldown nutzt last_changed(DPL Mode) statt Noah Power
+# - Override aktiviert DPL Mode falls nicht aktiv
+# - Release aktiviert DPL Mode falls nicht aktiv
+# - action_type VOR Debug-Call gesetzt
+# - Kein Ping-Pong mehr
+# - Keine Duplikate in Listen mehr
+# - Keine should-Konflikte mehr
 
 # ========== CHANGELOG ==========
 # v2.21 (2026-04-06)
@@ -1449,4 +885,4 @@ max_exceeded: silent
 # - SOC-basiertes Loadbalancing mit Hysterese
 # - Optionaler Netzbezug-Override
 # - Optionaler DTU Solar-Optimizer
-# - Actions mit umfangreichen Variablen für Benachrichtigungen
+# - Actions mit umfangreichen Variablen für Benachrich

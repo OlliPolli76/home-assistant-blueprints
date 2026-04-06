@@ -1,11 +1,11 @@
 blueprint:
-  name: Noah Battery Balancer 2.22
+  name: Noah Battery Balancer 2.23
   description: |
-    Einfaches, klares Lastmanagement für bis zu 6 Growatt Noah 2000.
-    Pro-Noah Einzelsteuerung ohne komplexe Abhängigkeiten.
+    SOC-Balancing für bis zu 6 Growatt Noah 2000.
+    Drosselt schwächere Noah wenn stärkere >= max_soc.
     
-    Simple, clear load management for up to 6 Growatt Noah 2000.
-    Per-Noah individual control without complex dependencies.
+    SOC balancing for up to 6 Growatt Noah 2000.
+    Throttles weaker units when stronger ones >= max_soc.
   
   domain: automation
   source_url: https://github.com/OlliPolli76/home-assistant-blueprints/blob/main/noah_battery_balancer.yaml
@@ -449,18 +449,12 @@ action:
           {% if dtu_mode_select == [] %}
             {{ true }}
           {% else %}
-            {% set last_change = state_attr(dtu_mode_select, 'last_changed') | as_datetime %}
-            {% if last_change is none %}
-              {{ true }}
-            {% else %}
-              {{ (now() - last_change).total_seconds() / 60 >= netzbezug_cooldown_minutes }}
-            {% endif %}
+            {{ states(dtu_mode_select) != '0' }}
           {% endif %}
     then:
-      # DPL Mode aktivieren falls nicht aktiv
       - if:
           - condition: template
-            value_template: "{{ dtu_mode_select != [] and states(dtu_mode_select) != '0' }}"
+            value_template: "{{ dtu_mode_select != [] }}"
         then:
           - action: select.select_option
             target:
@@ -468,43 +462,51 @@ action:
             data:
               option: "0"
       
-      # Alle Noah auf max
       - repeat:
           count: "{{ noah_units | length }}"
           sequence:
-            - action: number.set_value
-              target:
-                entity_id: "{{ noah_units[repeat.index - 1].power }}"
-              data:
-                value: "{{ max_output_power }}"
+            - variables:
+                unit_power: "{{ noah_units[repeat.index - 1].power }}"
+                current_power: "{{ states(unit_power) | float(0) }}"
+            
+            - if:
+                - condition: template
+                  value_template: "{{ current_power != max_output_power }}"
+              then:
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ unit_power }}"
+                  data:
+                    value: "{{ max_output_power }}"
+                
+                - variables:
+                    released_units: "{{ released_units + [noah_units[repeat.index - 1].name] }}"
       
       - variables:
           action_type: "netzbezug_override"
-          changes_made: true
+          changes_made: "{{ released_units | length > 0 }}"
       
       - if:
           - condition: template
-            value_template: "{{ actions != [] }}"
+            value_template: "{{ changes_made and actions != [] }}"
         then:
           - choose:
               - conditions: []
                 sequence: !input actions
       
-      - stop: "Override aktiv"
+      - stop: "Netzbezug Override aktiv"
 
   # ========== PRIO 3: Cooldown Check ==========
   - if:
       - condition: template
+        value_template: "{{ dtu_mode_select != [] }}"
+      - condition: template
         value_template: |
-          {% if dtu_mode_select == [] %}
+          {% set last_change = state_attr(dtu_mode_select, 'last_changed') | as_datetime %}
+          {% if last_change is none %}
             {{ false }}
           {% else %}
-            {% set last_change = state_attr(dtu_mode_select, 'last_changed') | as_datetime %}
-            {% if last_change is none %}
-              {{ false }}
-            {% else %}
-              {{ (now() - last_change).total_seconds() / 60 < netzbezug_cooldown_minutes }}
-            {% endif %}
+            {{ (now() - last_change).total_seconds() / 60 < netzbezug_cooldown_minutes }}
           {% endif %}
     then:
       - if:
@@ -518,7 +520,20 @@ action:
       
       - stop: "Cooldown aktiv"
 
-  # ========== PRIO 4: Basis-Logik (Pro Noah einzeln) ==========
+  # ========== PRIO 4: Basis-Logik mit SOC-Balancing ==========
+  
+  # Prüfe ob irgendein Noah >= max_soc
+  - variables:
+      others_above_max: |
+        {% set result = false %}
+        {% for unit in noah_units %}
+          {% if states(unit.soc) | float(0) >= max_soc %}
+            {% set result = true %}
+          {% endif %}
+        {% endfor %}
+        {{ result }}
+
+  # Pro Noah Loop mit Balancing-Logik
   - repeat:
       count: "{{ noah_units | length }}"
       sequence:
@@ -527,10 +542,10 @@ action:
             current_soc: "{{ states(current_noah.soc) | float(0) }}"
             current_power: "{{ states(current_noah.power) | float(0) }}"
 
-        # DROSSELN wenn >= max_soc UND Power != min
+        # DROSSELN wenn < max_soc UND andere >= max_soc UND Power != min
         - if:
             - condition: template
-              value_template: "{{ current_soc >= max_soc and current_power != min_output_power }}"
+              value_template: "{{ current_soc < max_soc and others_above_max and current_power != min_output_power }}"
           then:
             - action: number.set_value
               target:
@@ -542,10 +557,10 @@ action:
                 throttled_units: "{{ throttled_units + [current_noah.name] }}"
                 changes_made: true
 
-        # FREIGEBEN wenn <= min_soc UND Power != max
+        # FREIGEBEN wenn <= min_soc UND KEINE anderen >= max_soc UND Power != max
         - if:
             - condition: template
-              value_template: "{{ current_soc <= min_soc and current_power != max_output_power }}"
+              value_template: "{{ current_soc <= min_soc and not others_above_max and current_power != max_output_power }}"
           then:
             # DPL Mode aktivieren falls nicht aktiv
             - if:
@@ -582,307 +597,149 @@ action:
             sequence: !input actions
 
   # Debug-Log
-  - service: shell_command.noah_debug_log
-    data:
-      timestamp: "{{ now().isoformat() }}"
-      trigger: "{{ trigger.id ~ ': ' ~ (trigger.entity_id | default('N/A')) }}"
-      soc_ol: "{{ states(noah_1_soc) }}"
-      soc_or: "{{ states(noah_2_soc) }}"
-      soc_ul: "{{ states(noah_3_soc) }}"
-      soc_ur: "{{ states(noah_4_soc) }}"
-      power_ol: "{{ states(noah_1_power) }}"
-      power_or: "{{ states(noah_2_power) }}"
-      power_ul: "{{ states(noah_3_power) }}"
-      power_ur: "{{ states(noah_4_power) }}"
-      should_throttle: "[]"
-      should_release: "[]"
-      throttled: "{{ throttled_units | to_json }}"
-      released: "{{ released_units | to_json }}"
-      throttled_count: "{{ throttled_units | length }}"
-      active_count: "{{ noah_units | length - throttled_units | length }}"
-      changes: "{{ changes_made }}"
-      max_soc: "{{ max_soc }}"
-      min_soc: "{{ min_soc }}"
-      action_type: "{{ action_type }}"
+  - if:
+      - condition: template
+        value_template: "{{ debug_enabled }}"
+    then:
+      - service: shell_command.noah_debug_log
+        data:
+          timestamp: "{{ now().isoformat() }}"
+          trigger: "{{ trigger.id ~ ': ' ~ (trigger.entity_id | default('N/A')) }}"
+          soc_ol: "{{ states(noah_1_soc) }}"
+          soc_or: "{{ states(noah_2_soc) }}"
+          soc_ul: "{{ states(noah_3_soc) }}"
+          soc_ur: "{{ states(noah_4_soc) }}"
+          power_ol: "{{ states(noah_1_power) }}"
+          power_or: "{{ states(noah_2_power) }}"
+          power_ul: "{{ states(noah_3_power) }}"
+          power_ur: "{{ states(noah_4_power) }}"
+          should_throttle: "[]"
+          should_release: "[]"
+          throttled: "{{ throttled_units | to_json }}"
+          released: "{{ released_units | to_json }}"
+          throttled_count: "{{ throttled_units | length }}"
+          active_count: "{{ noah_units | length - throttled_units | length }}"
+          changes: "{{ changes_made }}"
+          max_soc: "{{ max_soc }}"
+          min_soc: "{{ min_soc }}"
+          action_type: "{{ action_type }}"
 
 mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
-# v2.22 (2026-04-06)
-# - KOMPLETT NEU: Einfache, klare Pro-Noah-Logik
+# v2.23 (2026-04-06)
+# - KRITISCHER FIX: SOC-Balancing wieder aktiviert
 # 
-# ALTE Logik (v2.21 und früher):
-# - should_be_throttled: < max_soc wenn andere >= max_soc
-# - should_be_released: <= min_soc wenn keine anderen >= max_soc
-# → Zu komplex, Konflikte, Ping-Pong
+# Problem v2.22:
+# - Pro-Noah-Logik OHNE Balancing
+# - Noah >= 90% → gedrosselt (0W)
+# - Alle anderen aktiv (800W)
+# - KEIN Ausgleich zwischen Noah
+# - Beispiel: Noah 1=92%, Noah 2-4=85% → Noah 1 gedrosselt, 2-4 aktiv → SOC bleibt unterschiedlich
 # 
-# NEUE Logik v2.22:
-# - Pro Noah einzeln: >= max_soc → drosseln, <= min_soc → freigeben
-# - Keine Abhängigkeit von anderen Noah
-# - Keine should-Listen mehr
+# Lösung v2.23:
+# - others_above_max Variable vor Loop
+# - DROSSELN wenn < max_soc UND andere >= max_soc
+# - FREIGEBEN wenn <= min_soc UND KEINE anderen >= max_soc
+# - Beispiel: Noah 1=92%, Noah 2-4=85% → Noah 2-4 gedrosselt → SOC gleicht sich an
 # 
-# PRIORITÄTEN (in dieser Reihenfolge):
+# Beibehaltene Verbesserungen aus v2.22:
+# - Klare Struktur
+# - Power-Check vor set_value (kein Telegram-Spam)
+# - Cooldown auf DPL Mode last_changed
+# - Override aktiviert DPL Mode
+# - Release aktiviert DPL Mode
+# - Debug-Log am Ende
+# 
+# LOGIK:
 # 1. DTU Solar: Alle 100% + vor Sonnenuntergang → DPL=2, alle 400W
 # 2. DTU Return: DPL=2 + min 1 < 100% → DPL=0
 # 3. Override: Netzbezug > Schwelle → DPL=0, alle 800W
-# 4. Cooldown: DPL Mode geändert < Cooldown → SKIP Basis
-# 5. Basis: Pro Noah >= 90% → 0W, <= 85% → 800W + DPL=0
-# 
-# FIXES:
-# - Cooldown nutzt last_changed(DPL Mode) statt Noah Power
-# - Override aktiviert DPL Mode falls nicht aktiv
-# - Release aktiviert DPL Mode falls nicht aktiv
-# - action_type VOR Debug-Call gesetzt
-# - Kein Ping-Pong mehr
-# - Keine Duplikate in Listen mehr
-# - Keine should-Konflikte mehr
+# 4. Cooldown: DPL Mode geändert < 5 Min → SKIP Basis
+# 5. Basis SOC-Balancing:
+#    - Gibt es Noah >= 90%?
+#      JA: Drossle alle < 90% auf 0W
+#      NEIN: Gebe alle <= 85% auf 800W frei
 
-# ========== CHANGELOG ==========
+# v2.22 (2026-04-06)
+# - KOMPLETT NEU: Einfache, klare Pro-Noah-Logik
+# - ACHTUNG: KEIN SOC-Balancing mehr!
+# - Pro Noah einzeln: >= max_soc → drosseln, <= min_soc → freigeben
+# - Keine Abhängigkeit von anderen Noah
+# - v2.23 behebt dies durch Wiedereinführung von others_above_max
+
 # v2.21 (2026-04-06)
 # - ROLLBACK & KRITISCHE FIXES: Stabilität wiederherstellen
-# 
-# - FIX 1: Release-Logik Ping-Pong
-#   Problem: should_be_released prüfte "kein anderer >= max_soc"
-#   → Bei SOC zwischen min_soc (85%) und max_soc (90%): Release triggert
-#   → Noah 2: 89% → Release alle → 90% → Throttle → 89% → Release → LOOP
-#   Lösung: Release NUR bei <= min_soc, OHNE "others_above_max" Check
-#   → Release nur wenn wirklich unter min_soc (85%)
-#   → Keine Abhängigkeit von anderen Noah mehr
-# 
-# - FIX 2: Phase 2.5 Korrektur-Loop ENTFERNT (v2.20 war fehlerhaft)
-#   Problem: v2.20 Korrektur-Loop setzte ALLES auf 800W
-#   → Überschrieb korrektes Loadbalancing
-#   → Erzeugte Duplikate in released_units
-#   → Triggerte unnötige changes_made
-#   Lösung: Phase 2.5 komplett entfernt
-#   → Zurück zu stabiler v2.15 Logik
-#   → should_be_active wieder in Phase 3
-# 
-# - FIX 3: action_type im Debug-Log
-#   Problem: action_type in if-Block gesetzt → lokal, Debug sieht nur "no_action"
-#   Lösung: action_type VOR Debug-Call final setzen
-#   → Basierend auf throttled_units / released_units Listen
-# 
-# - FIX 4: Netzbezug-Override Cooldown
-#   Problem: Override → Loadbalancing → Override → LOOP
-#   → Cooldown sollte greifen, tut es aber nicht konsistent
-#   Note: Cooldown-Logik aus v2.15 beibehalten
-#   → Weitere Analyse nötig wenn Problem weiter besteht
-# 
-# v2.16-v2.20 waren instabil. v2.21 = v2.15 + Fixes.
-#
+# - Basis: v2.15 Code (letzte stabile Version)
+# - Plus Fixes aus v2.16-v2.20
+# - Cooldown-Logik aus v2.15 beibehalten
+# - v2.16-v2.20 waren instabil
+
 # v2.20 (2026-04-04)
 # - KRITISCHER FIX: Fehlende Aktivierungs-Logik
-# - Problem: Noah in should_be_active wurden NICHT auf max_output_power gesetzt
-#   → Nur Drosseln (should_be_throttled) und Release (should_be_released <= min_soc) funktionierten
-#   → Noah 1 (100%, sollte aktiv sein) blieb auf 0W nach früherem Fehler
-#   → Keine Korrektur bei manuellen Änderungen oder vorherigen Blueprint-Bugs
-# - Lösung: PHASE 2.5 Korrektur-Loop hinzugefügt
-#   → Prüft ALLE Noah in should_be_active
-#   → Setzt auf max_output_power wenn aktuell != max
-#   → Tracked als released_units + changes_made
-# - Robustheit: Korrigiert jetzt automatisch jeden Run
-#   → Manuelle Änderungen werden überschrieben
-#   → Vorherige Blueprint-Fehler werden ausgebügelt
-#   → System konvergiert immer zu korrektem Zustand
-#
+# - PHASE 2.5 Korrektur-Loop hinzugefügt
+# - Setzt Noah in should_be_active auf max_output_power
+
 # v2.19 (2026-04-04)
 # - KRITISCHER FIX: Debug-Log Argument-Shift
-# - Problem: Listen mit Spaces zerstören shell_command Argument-Positionen
-#   → should_be_throttled = ['Noah 3', 'Noah 4']
-#   → Als String: '[Noah 3, Noah 4]'
-#   → Bash interpretiert als 4 separate Args ([ Noah 3, Noah 4 ])
-#   → Alle nachfolgenden Parameter verschoben!
-#   → Log zeigt: should_throttled="[Noah", throttled_units="3, Noah", action_type="90"
-# - Lösung: Listen als JSON serialisieren
-#   → should_throttle: "{{ should_be_throttled | to_json }}"
-#   → Ergebnis: '["Noah 3", "Noah 4"]' (ein einzelnes Argument)
-#   → Argument-Positionen korrekt
-# - Betrifft: should_throttle, should_release, throttled, released
-#
+# - Listen als JSON serialisieren für korrekte Argument-Positionen
+
 # v2.18 (2026-04-04)
 # - KRITISCHER FIX: Debug-Call ans Ende verschoben
-# - Problem: Debug lief VOR Loadbalancing-Logik
-#   → Log zeigte immer "action_type: no_action"
-#   → Echte Actions unsichtbar im Log
-# - Lösung: Debug-Call ans Ende (vor mode: single)
-#   → Logged jetzt NACH allen Actions
-#   → action_type zeigt echte Aktion (loadbalancing/release/dtu_solar etc.)
-# - Fehlende initial variables hinzugefügt:
-#   → full_count, noah_status, noah_status_html, noah_status_markdown
-#   → Verhindert undefined errors in Telegram-Actions
-#
+# - action_type zeigt jetzt echte Aktion
+
 # v2.17 (2026-04-03)
 # - KRITISCHER FIX: Template undefined errors
-# - Problem 1: Debug-Call (Zeile 596) läuft VOR action_type gesetzt wird
-#   → Template error "action_type is undefined"
-# - Problem 2: trigger.entity_id ist bei numeric_state/DTU-Triggern leer
-#   → Log zeigt "trigger: ''"
-# - Lösung 1: Initial Variables Block am Anfang
-#   → action_type, throttled_units, released_units etc. auf defaults
-#   → Verhindert undefined errors im Debug-Call
-# - Lösung 2: trigger mit fallback
-#   → "{{ trigger.id ~ ': ' ~ (trigger.entity_id | default('N/A')) }}"
-#   → Log zeigt jetzt z.B. "noah_soc_change: sensor.noah_ol_total_battery_soc"
-# - action_type Parameter zum Debug-Call hinzugefügt (fehlte)
-#
+# - Initial Variables Block mit defaults
+
 # v2.16 (2026-04-03)
 # - KRITISCHER FIX: Globale Release Telegram-Spam
-# - Problem: Globale Release setzte ALLE Noah auf max_power ohne Power-Check
-#   → Bei allen SOC < min_soc: Jede SOC-Änderung triggert set_value
-#   → changes_made immer true → Telegram-Spam
-# - Lösung: Power-Check im Globalen Release Loop
-#   → Nur set_value wenn current_power != max_output_power
-#   → released_units Tracking
-#   → changes_made nur true wenn tatsächlich geändert
-# - Identisch zur Loadbalancing-Loop Logik
-#
+# - Power-Check im Release Loop
+
 # v2.12 (2026-04-03)
 # - KRITISCHER FIX: should_be_throttled Logik korrigiert
-# - Problem: "Wenn IRGENDEIN anderer >= max_soc → throttle diesen Noah"
-#   → Bei SOC 43,42,39,40% mit max_soc=42%: ALLE 4 wurden als "should throttle" markiert!
-#   → Loop actions: T=0 R=0 weil ALLE gedrosselt werden sollten (wer bleibt aktiv?)
-#   → Keine Telegram-Nachricht obwohl Drosselung nötig war
-# - Lösung: "Wenn DIESER Noah < max_soc UND andere >= max_soc → throttle"
-#   → Bei SOC 43,42,39,40%: Nur Noah 3,4 (39,40%) werden gedrosselt
-#   → Noah 1,2 (43,42%) bleiben aktiv
-#   → Telegram-Nachricht wird korrekt gesendet
-# - Jetzt funktioniert Loadbalancing wie vorgesehen!
-#
+# - "DIESER Noah < max_soc UND andere >= max_soc"
+
 # v2.11 (2026-04-03)
-# - KRITISCHER FIX: Globale Release Logik vereinfacht
-# - Problem: global_release_needed prüfte ob Noah >= max_soc existieren
-#   → Wenn alle < max_soc: Globale Release läuft NICHT
-#   → Loadbalancing Loop läuft stattdessen
-#   → Released alle wegen veraltetem Power-Check
-#   → Telegram-Spam obwohl alle schon aktiv
-# - Lösung: Globale Release OHNE global_release_needed Check
-#   → Wenn alle < min_soc: Setze ALLE auf max_output_power und STOP
-#   → Loadbalancing Loop läuft gar nicht erst
-# - Einfachere Logik: "Alle unter min_soc? → Alle aktiv. Punkt."
-#
+# - KRITISCHER FIX: Globale Release vereinfacht
+# - Alle unter min_soc → Alle aktiv
+
 # v2.10 (2026-04-03)
-# - Actions-Beschreibung umformatiert: {{variable}} statt variable: Beschreibung
-# - Alle Variablen werden jetzt IMMER gesetzt (keine undefined errors mehr)
-# - Fehlende Variablen in allen Actions-Blöcken ergänzt:
-#   - DTU Solar: max_soc_noah, netzbezug
-#   - DTU Return: throttled_noah, active_noah, throttled_count, active_count, max_soc_value, max_soc_noah, netzbezug
-#   - Netzbezug Override: hours_to_sunset
-#   - Globale Release: netzbezug, hours_to_sunset
-#   - Loadbalancing: netzbezug, hours_to_sunset
-# - Einfaches Kopieren der Variablen aus Beschreibung in Actions möglich
-#
+# - Actions-Beschreibung umformatiert
+# - Alle Variablen immer gesetzt
+
 # v2.9 (2026-04-03)
 # - KRITISCHER FIX: Globale Release Spam-Loop
-# - Problem: Globale Release prüfte veraltete Power states → Telegram-Spam
-# - Lösung: Prüfe ob should_be_throttled nicht leer (SOC-basiert, nicht Power)
-# - Globale Release triggert nur noch wenn wirklich Noah gedrosselt WERDEN MÜSSEN
-#
+# - SOC-basierte Prüfung statt Power
+
 # v2.8 (2026-04-01)
-# - KRITISCHER FIX: Jinja2 namespace für Liste-Konstruktion
-# - Problem: result = result + [item] funktioniert nicht korrekt in Jinja2 loops
-# - Lösung: namespace(list=[]) verwenden für mutable Listen
-# - Betrifft: should_be_throttled, should_be_released, should_be_active
-#
+# - KRITISCHER FIX: Jinja2 namespace für Listen
+
 # v2.7 (2026-04-01)
-# - KRITISCHER FIX: 2-Phasen-Tracking-System für Noah Power
-# - Problem: Noah Power Entities brauchen 2-3s bis sie aktualisiert werden
-# - Phase 1: Entscheide VOR set_value basierend auf SOC (nicht Power)
-# - Phase 2: Setze nur wenn Power != Ziel (mit veraltetem Check)
-# - Phase 3: Actions nutzen SOC-basierte Listen (nicht veraltete states)
-# - Cooldown Template Fix: as_timestamp erst NACH None-Check
-# - Lösung: Keine delays, schnelle Entscheidungen, korrekte Actions
-#
+# - KRITISCHER FIX: 2-Phasen-Tracking
+# - Cooldown Template Fix
+
 # v2.6 (2026-03-31)
-# - KRITISCHER FIX: Globale Release triggert nicht mehr bei jeder SOC-Änderung
-# - Condition erweitert: Nur wenn min. 1 Noah < max_output_power
-# - Problem: Release-Spam obwohl alle Noah bereits auf max
-# - Lösung: Prüfe ob überhaupt was zu tun ist
-#
+# - KRITISCHER FIX: Release-Spam vermeiden
+
 # v2.5 (2026-03-31)
-# - GLOBALE RELEASE-LOGIK: Wenn ALLE Noah < min_soc → Alle auf max_output_power
-# - NETZBEZUG-OVERRIDE VERBESSERUNGEN:
-#   - Neue Inputs: cooldown_minutes (5), off_threshold (200W), off_duration (60s)
-#   - Condition: Nur wenn min. 1 Noah < max_output_power
-#   - Cooldown-Check: Letzte Noah-Änderung > cooldown_minutes
-#   - Verhindert Ping-Pong zwischen Override und Loadbalancing
-# - Problem gelöst: Override → Netzbezug sinkt → Loadbalancing drosselt → Loop
-# - Lösung: Override nur bei mind. 1 gedrosseltem Noah + Cooldown-Zeit
-#
+# - Globale Release + Cooldown
+
 # v2.4 (2026-03-30)
-# - KRITISCHER FIX: Telegram-Nachrichten funktionieren jetzt
-# - Condition auf throttled_units/released_units statt final_throttled
-# - Problem: Noah brauchen 1-2s für Wertübernahme → final_throttled war beim Check leer
-# - Lösung: Prüfe ob number.set_value AUFGERUFEN wurde, nicht IST-Zustand
-#
+# - Telegram Fix
+
 # v2.3 (2026-03-30)
-# - KRITISCHER FIX: Actions werden nur bei echten Änderungen ausgeführt
-# - changes_made Flag eingeführt (DTU/Netzbezug/Loadbalancing)
-# - Loadbalancing-Condition auf final_throttled (IST-Zustand) umgestellt
-# - Step-Size für Min/Max Output Power auf 50W (Noah-Hardware-Kompatibilität)
-# - Default min_output_power: 20W → 50W
-#
+# - changes_made Flag
+
 # v2.2 (2026-03-29)
-# - Debug-System auf logbook.log umgestellt (6 Stellen)
-# - persistent_notification.create → logbook.log für saubere Logs
-# - Logbook-Einträge dauerhaft nachvollziehbar in HA History
-# - Keine UI-Spam mehr durch Debug-Modus
-#
+# - Debug auf logbook
+
 # v2.0 (2026-03-28)
-# - KRITISCHER FIX: !input durch Template-Variablen in number.set_value Actions ersetzt
-# - Problem: !input funktioniert nicht zuverlässig in if/repeat Blöcken → Actions schlagen fehl
-# - Lösung: value: "{{ max_output_power }}" statt value: !input max_output_power
-# - Betrifft: feed_in_output_power, max_output_power, min_output_power
-#
+# - !input Fix
+
 # v1.9 (2026-03-28)
-# - KRITISCHER FIX: Zustandserkennung basierend auf IST-Power statt Loop-Tracking
-# - Problem: Blueprint "vergisst" welche Noah gedrosselt sind zwischen Runs
-# - Lösung: current_power auslesen (== min_output_power = gedrosselt, == max_output_power = aktiv)
-# - Throttle nur wenn target_power != min_output_power (nicht schon gedrosselt)
-# - Release nur wenn current_power == min_output_power (aktuell gedrosselt)
-# - Actions-Variablen (final_throttled/final_active) basieren auf IST-Zustand aller Noah
-# - Debug zeigt jetzt current_power und "Is throttled" Status
-#
-# v1.8 (2026-03-28)
-# - DEBUG: Release-Logik Debug hinzugefügt
-# - Debug zeigt jetzt: Release-Trigger, released_units, throttled_units
-# - Hilft zu debuggen warum Noah unter min_soc gedrosselt bleiben
-#
-# v1.7 (2026-03-28)
-# - FIX: ':' in single-line descriptions durch '-' ersetzt
-# - Problem: YAML interpretiert "text (key: value)" als Mapping, auch mit Quotes
-# - Lösung: "positiv: Verbrauch" → "positiv - Verbrauch", "0: aktiv" → "0 - aktiv"
-#
-# v1.6 (2026-03-28)
-# - FIX: Letzte '=' Zeichen in Input-Descriptions ersetzt
-# - netzbezug_sensor: "positiv = Verbrauch" → "positiv: Verbrauch"
-# - dtu_mode_select: "0=aktiv" → "0: aktiv"
-#
-# v1.5 (2026-03-28)
-# - FIX: Actions Description - '=' durch ':' ersetzt
-# - Problem: YAML parse error "character '=' is reserved"
-# - Lösung: {{variable}} = Text → variable: Text
-#
-# v1.4 (2026-03-28)
-# - KRITISCHER FIX: noah_units Template korrigiert
-# - Problem: {{ units | to_json }} gab JSON-String zurück statt Array → Iteration fehlgeschlagen
-# - Lösung: Direktes {{ units }} ohne to_json
-# - all_soc_values, all_at_100, any_below_100 direkt auf Entity-IDs statt noah_units
-#
-# v1.3 (2026-03-28)
-# - KRITISCHER FIX: Blueprint-Inputs werden jetzt ZUERST als Variablen geladen
-# - Behebt Problem: noah_units war leer, weil noah_1_soc etc. undefined waren
-# - Alle Inputs (noah_*, max_soc, min_soc, dtu_*, netzbezug_*, actions) jetzt verfügbar
-#
-# v1.1 (2026-03-28)
-# - Debug-Modus hinzugefügt (Persistent Notifications)
-# - Debug an 4 Stellen: Variables, DTU Solar, Loadbalancing Start, Loop Iterations
-#
+# - IST-Zustand-basiert
+
 # v1.0.0 (2026-03-27)
 # - Initial Release
-# - Support für 1-6 Growatt Noah 2000 Einheiten
-# - SOC-basiertes Loadbalancing mit Hysterese
-# - Optionaler Netzbezug-Override
-# - Optionaler DTU Solar-Optimizer
-# - Actions mit umfangreichen Variablen für Benachrich

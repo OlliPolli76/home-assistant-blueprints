@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.20
+  name: Noah Battery Balancer 2.21
   description: |
     Intelligentes Lastmanagement für bis zu 6 Growatt Noah 2000 Batteriespeicher.
     Balanciert SOC-Unterschiede durch Drosselung, optimiert Netzbezug und steuert DTU für Nulleinspeisung.
@@ -1006,15 +1006,7 @@ action:
         {%- for unit in noah_units -%}
           {%- set current_soc = states(unit.soc) | float(0) -%}
           {%- if current_soc <= min_soc -%}
-            {%- set others_above_max = namespace(found=false) -%}
-            {%- for other in noah_units -%}
-              {%- if other.soc != unit.soc and states(other.soc) | float(0) >= max_soc -%}
-                {%- set others_above_max.found = true -%}
-              {%- endif -%}
-            {%- endfor -%}
-            {%- if not others_above_max.found -%}
-              {%- set result.list = result.list + [unit.name] -%}
-            {%- endif -%}
+            {%- set result.list = result.list + [unit.name] -%}
           {%- endif -%}
         {%- endfor -%}
         {{ result.list | unique | list }}
@@ -1084,8 +1076,7 @@ action:
                 released_units: "{{ released_units + [current_noah.name] }}"
                 changes_made: true
 
-  # PHASE 2.5: Korrektur für should_be_active
-  # Stelle sicher dass ALLE Noah die aktiv sein sollen auch auf max_output_power sind
+  # PHASE 3: Actions Variablen (basiert auf should-Listen, nicht veraltetem states())
   - variables:
       # Wer sollte aktiv sein? = Alle außer should_be_throttled
       should_be_active: |
@@ -1096,49 +1087,6 @@ action:
           {%- endif -%}
         {%- endfor -%}
         {{ result.list }}
-
-  - repeat:
-      count: "{{ should_be_active | length }}"
-      sequence:
-        - variables:
-            active_noah_name: "{{ should_be_active[repeat.index - 1] }}"
-            # Finde Noah-Objekt anhand Name
-            active_noah: |
-              {%- for unit in noah_units -%}
-                {%- if unit.name == active_noah_name -%}
-                  {{ unit }}
-                  {%- break -%}
-                {%- endif -%}
-              {%- endfor -%}
-            active_power: "{{ states(active_noah.power) | float(0) }}"
-        
-        # Nur setzen wenn nicht bereits auf max
-        - if:
-            - condition: template
-              value_template: "{{ active_power != max_output_power }}"
-          then:
-            # DEBUG: Korrektur
-            - if:
-                - condition: template
-                  value_template: "{{ debug_enabled }}"
-              then:
-                - service: logbook.log
-                  data:
-                    name: Noah Balancer Correction
-                    message: "{{ active_noah.name }} corrected - Should be active but at {{ active_power }}W → {{ max_output_power }}W"
-            
-            - action: number.set_value
-              target:
-                entity_id: "{{ active_noah.power }}"
-              data:
-                value: "{{ max_output_power }}"
-            
-            # Tracking: Als released_units hinzufügen (da auf max gesetzt)
-            - variables:
-                released_units: "{{ released_units + [active_noah.name] }}"
-                changes_made: true
-
-  # PHASE 3: Actions Variablen (basiert auf should-Listen, nicht veraltetem states())
 
   # DEBUG: Final Units Status
   - if:
@@ -1223,6 +1171,10 @@ action:
               - conditions: []
                 sequence: !input actions
 
+  # ========== Final action_type setzen für Debug ==========
+  - variables:
+      action_type: "{{ 'release' if released_units | length > 0 else ('loadbalancing' if throttled_units | length > 0 else 'no_action') }}"
+
   # ========== DEBUG: File Logging (After All Logic) ==========
   - service: shell_command.noah_debug_log
     data:
@@ -1251,6 +1203,39 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.21 (2026-04-06)
+# - ROLLBACK & KRITISCHE FIXES: Stabilität wiederherstellen
+# 
+# - FIX 1: Release-Logik Ping-Pong
+#   Problem: should_be_released prüfte "kein anderer >= max_soc"
+#   → Bei SOC zwischen min_soc (85%) und max_soc (90%): Release triggert
+#   → Noah 2: 89% → Release alle → 90% → Throttle → 89% → Release → LOOP
+#   Lösung: Release NUR bei <= min_soc, OHNE "others_above_max" Check
+#   → Release nur wenn wirklich unter min_soc (85%)
+#   → Keine Abhängigkeit von anderen Noah mehr
+# 
+# - FIX 2: Phase 2.5 Korrektur-Loop ENTFERNT (v2.20 war fehlerhaft)
+#   Problem: v2.20 Korrektur-Loop setzte ALLES auf 800W
+#   → Überschrieb korrektes Loadbalancing
+#   → Erzeugte Duplikate in released_units
+#   → Triggerte unnötige changes_made
+#   Lösung: Phase 2.5 komplett entfernt
+#   → Zurück zu stabiler v2.15 Logik
+#   → should_be_active wieder in Phase 3
+# 
+# - FIX 3: action_type im Debug-Log
+#   Problem: action_type in if-Block gesetzt → lokal, Debug sieht nur "no_action"
+#   Lösung: action_type VOR Debug-Call final setzen
+#   → Basierend auf throttled_units / released_units Listen
+# 
+# - FIX 4: Netzbezug-Override Cooldown
+#   Problem: Override → Loadbalancing → Override → LOOP
+#   → Cooldown sollte greifen, tut es aber nicht konsistent
+#   Note: Cooldown-Logik aus v2.15 beibehalten
+#   → Weitere Analyse nötig wenn Problem weiter besteht
+# 
+# v2.16-v2.20 waren instabil. v2.21 = v2.15 + Fixes.
+#
 # v2.20 (2026-04-04)
 # - KRITISCHER FIX: Fehlende Aktivierungs-Logik
 # - Problem: Noah in should_be_active wurden NICHT auf max_output_power gesetzt

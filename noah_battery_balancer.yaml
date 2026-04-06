@@ -1,5 +1,5 @@
 blueprint:
-  name: Noah Battery Balancer 2.25
+  name: Noah Battery Balancer 2.26
   description: |
     SOC-Balancing für bis zu 6 Growatt Noah 2000.
     Drosselt schwächere Noah wenn stärkere >= max_soc.
@@ -532,14 +532,7 @@ action:
   
   # Prüfe ob irgendein Noah >= max_soc
   - variables:
-      others_above_max: >-
-        {%- set result = false -%}
-        {%- for unit in noah_units -%}
-          {%- if states(unit.soc) | float(0) >= max_soc -%}
-            {%- set result = true -%}
-          {%- endif -%}
-        {%- endfor -%}
-        {{ result }}
+      others_above_max: "{{ noah_units | map(attribute='soc') | map('states') | map('float', 0) | select('ge', max_soc) | list | length > 0 }}"
 
   # Pro Noah Loop mit Balancing-Logik
   - repeat:
@@ -636,6 +629,31 @@ mode: single
 max_exceeded: silent
 
 # ========== CHANGELOG ==========
+# v2.26 (2026-04-06)
+# - KRITISCHER FIX: others_above_max Template-Syntax
+# 
+# Problem v2.25:
+# - variables: others_above_max: >- (multi-line mit folded block)
+# - Action variables: Blöcke rendern KEINE multi-line Templates
+# - Template wird als STRING gespeichert: "{% set result = false %}..."
+# - Trace zeigt: others_above_max = String, NICHT boolean
+# 
+# Root Cause (aus HA Docs validiert):
+# - Top-level variables: (Blueprint) → Template-Syntax flexibel
+# - Action variables: → NUR einzeiliges "{{ }}" Template
+# - Multi-line (|, >-) wird als literal String interpretiert
+# 
+# Lösung v2.26:
+# - Einzeilige Filter-Chain mit "{{ }}" Syntax:
+#   others_above_max: "{{ noah_units | map(attribute='soc') | map('states') | map('float', 0) | select('ge', max_soc) | list | length > 0 }}"
+# - Ablauf validiert:
+#   1. map(attribute='soc') → extrahiert entity_ids
+#   2. map('states') → holt States
+#   3. map('float', 0) → konvertiert zu float
+#   4. select('ge', max_soc) → filtert >= max_soc
+#   5. list | length > 0 → True wenn Liste nicht leer
+# - Korrekt nach HA Script Syntax Dokumentation
+# 
 # v2.25 (2026-04-06)
 # - KRITISCHER FIX: others_above_max Template wird nicht ausgeführt
 # 
